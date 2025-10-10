@@ -1,50 +1,84 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useCallback, useMemo, useState } from 'react';
+import Sidebar from './components/Sidebar';
+import SheetGrid from './components/SheetGrid';
+import { sampleWorkspace, sampleBook } from './samples/sampleData';
+import type { BookFile } from './types/schema';
+import './App.css';
+
+const initialBooks: BookFile[] = [sampleBook];
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [workspace] = useState(sampleWorkspace);
+  const [books] = useState(initialBooks);
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(
+    workspace.books[0]?.id ?? null
+  );
+  const [selectedSheetId, setSelectedSheetId] = useState<string | null>(
+    initialBooks[0]?.sheets[0]?.id ?? null
+  );
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const activeBook = useMemo(
+    () => books.find((book) => book.book.id === selectedBookId) ?? null,
+    [books, selectedBookId]
+  );
+
+  const activeSheet = useMemo(
+    () => activeBook?.sheets.find((sheet) => sheet.id === selectedSheetId) ?? null,
+    [activeBook, selectedSheetId]
+  );
+
+  const handleSelectBook = useCallback(
+    (bookId: string) => {
+      setSelectedBookId(bookId);
+      const book = books.find((b) => b.book.id === bookId);
+      const firstSheet = book?.sheets[0];
+      setSelectedSheetId(firstSheet ? firstSheet.id : null);
+    },
+    [books]
+  );
+
+  const handleSelectSheet = useCallback((bookId: string, sheetId: string) => {
+    setSelectedBookId(bookId);
+    setSelectedSheetId(sheetId);
+  }, []);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <div className="app-shell">
+      <Sidebar
+        workspace={workspace}
+        books={books}
+        selectedBookId={selectedBookId}
+        selectedSheetId={selectedSheetId}
+        onSelectBook={handleSelectBook}
+        onSelectSheet={handleSelectSheet}
+      />
+      <section className="main-view">
+        <header className="main-view__header">
+          <div>
+            <h2 className="main-view__title">{activeSheet?.name ?? 'シートを選択してください'}</h2>
+            <p className="main-view__subtitle">
+              {activeBook ? activeBook.book.name : 'ブックを選択してください'}
+            </p>
+          </div>
+          {activeSheet ? (
+            <div className="main-view__meta">
+              <span>
+                行: <strong>{activeSheet.gridSize.rows}</strong>
+              </span>
+              <span>
+                列: <strong>{activeSheet.gridSize.cols}</strong>
+              </span>
+              <span>
+                シート内セル: <strong>{Object.keys(activeSheet.rows).length}</strong>
+              </span>
+            </div>
+          ) : null}
+        </header>
+        <div className="main-view__content">
+          <SheetGrid sheet={activeSheet ?? null} />
+        </div>
+      </section>
+    </div>
   );
 }
 

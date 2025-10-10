@@ -2,12 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import type { WorkspaceFile, BookFile } from '../../types/schema';
-import {
-  assertWorkspaceFile,
-  assertBookFile,
-  validateWorkspaceFile,
-  validateBookFile
-} from '../schemaValidator';
+import { validateWorkspaceFile, validateBookFile } from '../schemaValidator';
 
 const ensureDir = async (path: string) => {
   await mkdir(path, { recursive: true });
@@ -24,8 +19,11 @@ const parseJson = <T>(raw: string): T => {
 export const readWorkspaceFile = async (filePath: string): Promise<WorkspaceFile> => {
   const raw = await readFile(filePath, 'utf-8');
   const data = parseJson<unknown>(raw);
-  assertWorkspaceFile(data);
-  return data;
+  const result = validateWorkspaceFile(data);
+  if (!result.valid) {
+    throw new Error(`Invalid workspace file.\n${result.errors.join('\n')}`);
+  }
+  return data as WorkspaceFile;
 };
 
 export const writeWorkspaceFile = async (
@@ -44,8 +42,11 @@ export const writeWorkspaceFile = async (
 export const readBookFile = async (filePath: string): Promise<BookFile> => {
   const raw = await readFile(filePath, 'utf-8');
   const data = parseJson<unknown>(raw);
-  assertBookFile(data);
-  return data;
+  const result = validateBookFile(data);
+  if (!result.valid) {
+    throw new Error(`Invalid book file.\n${result.errors.join('\n')}`);
+  }
+  return data as BookFile;
 };
 
 export const writeBookFile = async (filePath: string, book: BookFile): Promise<void> => {
