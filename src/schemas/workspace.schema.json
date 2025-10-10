@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/workspace.json",
+  "title": "Workspace",
+  "type": "object",
+  "required": ["schemaVersion", "workspace", "folders", "books"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "workspace": {
+      "type": "object",
+      "required": ["id", "name", "createdAt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "createdAt": { "$ref": "#/$defs/dateTime" },
+        "updatedAt": { "$ref": "#/$defs/dateTime" },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "theme": { "enum": ["light", "dark", "system"] },
+            "sidebarWidth": { "type": "integer", "minimum": 160, "maximum": 640 },
+            "recentBookIds": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/id" },
+              "uniqueItems": true,
+              "maxItems": 20
+            },
+            "recentSheetIds": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/id" },
+              "uniqueItems": true,
+              "maxItems": 20
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "folders": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/folder" },
+      "default": []
+    },
+    "books": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/bookRef" },
+      "default": []
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{4,64}$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "folder": {
+      "type": "object",
+      "required": ["id", "name", "order"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "parentId": {
+          "oneOf": [
+            { "$ref": "#/$defs/id" },
+            { "type": "null" }
+          ]
+        },
+        "order": { "type": "number" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": false
+    },
+    "bookRef": {
+      "type": "object",
+      "required": ["id", "name", "dataPath", "order", "createdAt", "updatedAt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "folderId": {
+          "oneOf": [
+            { "$ref": "#/$defs/id" },
+            { "type": "null" }
+          ]
+        },
+        "order": { "type": "number" },
+        "dataPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "thumbPath": {
+          "type": "string"
+        },
+        "activeSheetId": { "$ref": "#/$defs/id" },
+        "createdAt": { "$ref": "#/$defs/dateTime" },
+        "updatedAt": { "$ref": "#/$defs/dateTime" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": false
+    }
+  }
+}
