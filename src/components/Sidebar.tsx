@@ -25,6 +25,10 @@ const Sidebar: FC<SidebarProps> = ({
   const booksById = useMemo(() => new Map(books.map((book) => [book.book.id, book])), [books]);
   const workspaceMeta = workspace?.workspace;
   const workspaceBooks = workspace?.books ?? [];
+  const createDisabled = !workspace || !onCreateBook;
+  const createTitle = createDisabled
+    ? 'ワークスペースを開いてから新規ブックを作成できます'
+    : '新しいブックを追加';
 
   return (
     <aside className="sidebar">
@@ -87,8 +91,9 @@ const Sidebar: FC<SidebarProps> = ({
         <button
           type="button"
           className="sidebar__actionButton"
-          disabled={!workspace || !onCreateBook}
+          disabled={createDisabled}
           onClick={onCreateBook}
+          title={createTitle}
         >
           + 新規ブック
         </button>
