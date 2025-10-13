@@ -16,17 +16,17 @@ const formatErrors = (errors: ErrorObject[] | null | undefined): string[] =>
     return `${path} ${err.message ?? ''}`.trim();
   });
 
-export interface ValidationResult<T> {
-  valid: data is T;
+export interface ValidationResult {
+  valid: boolean;
   errors: string[];
 }
 
-export const validateWorkspaceFile = (data: unknown): ValidationResult<WorkspaceFile> => {
+export const validateWorkspaceFile = (data: unknown): ValidationResult => {
   const valid = workspaceValidator(data) as boolean;
   return { valid, errors: valid ? [] : formatErrors(workspaceValidator.errors) };
 };
 
-export const validateBookFile = (data: unknown): ValidationResult<BookFile> => {
+export const validateBookFile = (data: unknown): ValidationResult => {
   const valid = bookValidator(data) as boolean;
   return { valid, errors: valid ? [] : formatErrors(bookValidator.errors) };
 };
