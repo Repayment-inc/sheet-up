@@ -146,6 +146,17 @@ button {
   cursor: not-allowed;
 }
 
+.sidebar__actionButton:not(:disabled) {
+  cursor: pointer;
+  border-style: solid;
+  border-color: rgba(249, 250, 251, 0.5);
+}
+
+.sidebar__actionButton:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f9fafb;
+}
+
 .main-view {
   flex: 1;
   display: flex;
