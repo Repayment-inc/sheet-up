@@ -143,6 +143,20 @@ button {
   border: 1px dashed rgba(249, 250, 251, 0.3);
   background: transparent;
   color: rgba(249, 250, 251, 0.7);
+}
+
+.sidebar__actionButton:not(:disabled) {
+  cursor: pointer;
+  border-style: solid;
+  border-color: rgba(249, 250, 251, 0.5);
+}
+
+.sidebar__actionButton:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f9fafb;
+}
+
+.sidebar__actionButton:disabled {
   cursor: not-allowed;
 }
 
