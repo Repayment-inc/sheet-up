@@ -1,25 +1,111 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import SheetGrid from './components/SheetGrid';
+import { isTauri } from './lib/env';
+import {
+  openWorkspaceFromDialog,
+  saveWorkspaceSnapshot,
+  showErrorDialog
+} from './lib/tauri/workspaceBridge';
 import { sampleWorkspace, sampleBook } from './samples/sampleData';
+import type { WorkspaceSnapshot } from './types/workspaceSnapshot';
 import type { BookFile } from './types/schema';
 import './App.css';
 
-const initialBooks: BookFile[] = [sampleBook];
+const sampleSnapshot: WorkspaceSnapshot = {
+  workspace: { filePath: 'sample/workspace.json', data: sampleWorkspace },
+  books: [{ filePath: 'sample/books/book-001.json', data: sampleBook }]
+};
+
+type BusyState = 'idle' | 'loading' | 'saving';
+
+const toErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 function App() {
-  const [workspace] = useState(sampleWorkspace);
-  const [books] = useState(initialBooks);
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(
-    workspace.books[0]?.id ?? null
-  );
-  const [selectedSheetId, setSelectedSheetId] = useState<string | null>(
-    initialBooks[0]?.sheets[0]?.id ?? null
+  const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(isTauri ? null : sampleSnapshot);
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
+  const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null);
+  const [busyState, setBusyState] = useState<BusyState>('idle');
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(isTauri);
+
+  const snapshotRef = useRef<WorkspaceSnapshot | null>(snapshot);
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
+
+  const initializeSelection = useCallback((nextSnapshot: WorkspaceSnapshot) => {
+    const fallbackBookFromWorkspace = nextSnapshot.workspace.data.books[0]?.id ?? null;
+    const fallbackBookFromFiles = nextSnapshot.books[0]?.data.book.id ?? null;
+    const nextBookId = fallbackBookFromWorkspace ?? fallbackBookFromFiles;
+    const matchingBook = nextSnapshot.books.find((book) => book.data.book.id === nextBookId);
+    const nextSheetId = matchingBook?.data.sheets[0]?.id ?? null;
+
+    setSelectedBookId(nextBookId);
+    setSelectedSheetId(nextSheetId);
+  }, []);
+
+  const handleWorkspaceLoaded = useCallback(
+    (nextSnapshot: WorkspaceSnapshot) => {
+      setSnapshot(nextSnapshot);
+      initializeSelection(nextSnapshot);
+    },
+    [initializeSelection]
   );
 
+  const handleOpenWorkspace = useCallback(async () => {
+    if (!isTauri) return;
+    setBusyState('loading');
+    try {
+      const loaded = await openWorkspaceFromDialog();
+      if (loaded) {
+        handleWorkspaceLoaded(loaded);
+      }
+    } catch (error) {
+      await showErrorDialog('ワークスペースの読み込みに失敗しました', toErrorMessage(error));
+    } finally {
+      setBusyState('idle');
+    }
+  }, [handleWorkspaceLoaded]);
+
+  const handleSaveWorkspace = useCallback(async () => {
+    if (!snapshotRef.current || !isTauri) return;
+    setBusyState('saving');
+    try {
+      await saveWorkspaceSnapshot(snapshotRef.current);
+    } catch (error) {
+      await showErrorDialog('保存に失敗しました', toErrorMessage(error));
+    } finally {
+      setBusyState('idle');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!autoSaveEnabled || !isTauri) {
+      return;
+    }
+    if (!snapshot) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void handleSaveWorkspace();
+    }, 800);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [snapshot, autoSaveEnabled, handleSaveWorkspace]);
+
+  const loadedBooks = snapshot?.books ?? [];
+  const bookFiles: BookFile[] = useMemo(
+    () => loadedBooks.map((entry) => entry.data),
+    [loadedBooks]
+  );
+
+  const workspaceFile = snapshot?.workspace.data ?? null;
+
   const activeBook = useMemo(
-    () => books.find((book) => book.book.id === selectedBookId) ?? null,
-    [books, selectedBookId]
+    () => bookFiles.find((book) => book.book.id === selectedBookId) ?? null,
+    [bookFiles, selectedBookId]
   );
 
   const activeSheet = useMemo(
@@ -30,11 +116,11 @@ function App() {
   const handleSelectBook = useCallback(
     (bookId: string) => {
       setSelectedBookId(bookId);
-      const book = books.find((b) => b.book.id === bookId);
-      const firstSheet = book?.sheets[0];
+      const book = loadedBooks.find((entry) => entry.data.book.id === bookId);
+      const firstSheet = book?.data.sheets[0];
       setSelectedSheetId(firstSheet ? firstSheet.id : null);
     },
-    [books]
+    [loadedBooks]
   );
 
   const handleSelectSheet = useCallback((bookId: string, sheetId: string) => {
@@ -42,11 +128,32 @@ function App() {
     setSelectedSheetId(sheetId);
   }, []);
 
+  const renderEmptyState = () => (
+    <div className="main-view__empty">
+      <h2>ワークスペースを開いてください</h2>
+      <p>既存のワークスペースフォルダを選択すると、workspace.json とブックファイルを読み込みます。</p>
+      {isTauri ? (
+        <button
+          type="button"
+          className="main-view__primaryButton"
+          onClick={handleOpenWorkspace}
+          disabled={busyState === 'loading'}
+        >
+          {busyState === 'loading' ? '読み込み中…' : 'ワークスペースを開く'}
+        </button>
+      ) : (
+        <p className="main-view__note">ブラウザプレビューではサンプルデータのみ閲覧できます。</p>
+      )}
+    </div>
+  );
+
+  const autosaveDescription = autoSaveEnabled ? '自動保存オン' : '自動保存オフ';
+
   return (
     <div className="app-shell">
       <Sidebar
-        workspace={workspace}
-        books={books}
+        workspace={workspaceFile}
+        books={bookFiles}
         selectedBookId={selectedBookId}
         selectedSheetId={selectedSheetId}
         onSelectBook={handleSelectBook}
@@ -55,27 +162,55 @@ function App() {
       <section className="main-view">
         <header className="main-view__header">
           <div>
-            <h2 className="main-view__title">{activeSheet?.name ?? 'シートを選択してください'}</h2>
+            <h2 className="main-view__title">
+              {activeSheet?.name ??
+                (snapshot ? 'シートを選択してください' : 'ワークスペースを開いてください')}
+            </h2>
             <p className="main-view__subtitle">
-              {activeBook ? activeBook.book.name : 'ブックを選択してください'}
+              {activeBook
+                ? activeBook.book.name
+                : snapshot
+                  ? 'ブックを選択してください'
+                  : 'データはまだ読み込まれていません'}
             </p>
           </div>
-          {activeSheet ? (
-            <div className="main-view__meta">
-              <span>
-                行: <strong>{activeSheet.gridSize.rows}</strong>
-              </span>
-              <span>
-                列: <strong>{activeSheet.gridSize.cols}</strong>
-              </span>
-              <span>
-                シート内セル: <strong>{Object.keys(activeSheet.rows).length}</strong>
-              </span>
+          <div className="main-view__headerActions">
+            {isTauri ? (
+              <div className="main-view__toolbar">
+                <button
+                  type="button"
+                  className="main-view__actionButton"
+                  onClick={handleOpenWorkspace}
+                  disabled={busyState === 'loading'}
+                >
+                  {snapshot ? '別のワークスペースを開く' : 'ワークスペースを開く'}
+                </button>
+                <button
+                  type="button"
+                  className="main-view__actionButton"
+                  onClick={handleSaveWorkspace}
+                  disabled={!snapshot || busyState === 'saving'}
+                >
+                  {busyState === 'saving' ? '保存中…' : '保存'}
+                </button>
+                <label className="main-view__toggle">
+                  <input
+                    type="checkbox"
+                    checked={autoSaveEnabled}
+                    onChange={(event) => setAutoSaveEnabled(event.currentTarget.checked)}
+                  />
+                  <span>{autosaveDescription}</span>
+                </label>
+              </div>
+            ) : null}
+            <div className="main-view__status">
+              {busyState === 'loading' ? '読み込み中…' : null}
+              {busyState === 'saving' ? '保存中…' : null}
             </div>
-          ) : null}
+          </div>
         </header>
         <div className="main-view__content">
-          <SheetGrid sheet={activeSheet ?? null} />
+          {snapshot ? <SheetGrid sheet={activeSheet ?? null} /> : renderEmptyState()}
         </div>
       </section>
     </div>

@@ -159,7 +159,7 @@ button {
   padding: 20px 28px;
   border-bottom: 1px solid #e5e7eb;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
@@ -187,11 +187,111 @@ button {
   color: #111827;
 }
 
+.main-view__headerActions {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.main-view__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.main-view__actionButton {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.main-view__actionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.main-view__actionButton:not(:disabled):hover {
+  background: #f3f4f6;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.main-view__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #4b5563;
+  user-select: none;
+}
+
+.main-view__toggle input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.main-view__status {
+  min-height: 24px;
+  font-size: 0.85rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+}
+
 .main-view__content {
   flex: 1;
   min-height: 0;
   padding: 0 28px 28px;
   display: flex;
+}
+
+.main-view__empty {
+  margin: auto;
+  max-width: 480px;
+  text-align: center;
+  color: #4b5563;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.main-view__empty h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #111827;
+}
+
+.main-view__primaryButton {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.main-view__primaryButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.main-view__primaryButton:not(:disabled):hover {
+  background: #1d4ed8;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+}
+
+.main-view__note {
+  font-size: 0.85rem;
+  color: #9ca3af;
 }
 
 .sheet-grid {
@@ -278,7 +378,18 @@ button {
     align-items: flex-start;
   }
 
+  .main-view__headerActions {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+  }
+
   .main-view__meta {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .main-view__toolbar {
     width: 100%;
     flex-wrap: wrap;
   }

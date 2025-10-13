@@ -1,53 +1,62 @@
-# Tauri + React + Typescript
+# Sheet Up
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Tauri + React 製のローカルファーストなスプレッドシートアプリです。  
+Obsidian ライクなフォルダ構造でシートを管理し、JSON ストレージをそのまま AI やスクリプトに流し込めることを目指しています。
 
-## Recommended IDE Setup
-
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
-
-## Development Setup
-
-### Method 1: Using Dev Container
-
-**✋coming soon**
-
-### Method 2: Running on Host Machine
-
-#### Prerequisites
-
-**macOS:**
-```bash
-# Install Xcode Command Line Tools
-xcode-select --install
-```
-
-**Linux (Debian/Ubuntu):**
-```bash
-sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev \
-  build-essential \
-  curl \
-  wget \
-  file \
-  libxdo-dev \
-  libssl-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev
-```
-
-**Windows:**
-- Install [Microsoft Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-- Install [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
-
-#### Install Dependencies and Run
+## セットアップ
 
 ```bash
-# Install Node.js dependencies
+# 依存パッケージのインストール
 bun install
 
-# Run development server
+# デスクトップアプリを起動
 bun run tauri dev
 ```
 
-The desktop app will launch automatically on your host machine.
+初回起動時は空の状態で立ち上がります。`ワークスペースを開く` ボタンからワークスペースフォルダ（例: `/path/to/workspace`）を選択してください。
+
+### 必要なランタイム
+- Bun
+- Rust toolchain（`mise` を使って `rust` と `bun` を揃えています）
+- Tauri 2 がサポートする各 OS のビルド依存関係  
+  （macOS: Xcode Command Line Tools / Windows: MSVC + WebView2 / Linux: WebKit など）
+
+## ワークスペース構造
+
+```
+workspace.json
+books/
+  └─ book-001.json
+thumbs/         # 任意
+```
+
+- `workspace.json` にはフォルダ・ブックの一覧とメタ情報を保存します。
+- 各ブックの実データは `books/{bookId}.json` に保存します。
+- `workspace.json` の `books[].dataPath` でブックファイルへの相対パスを指定します。
+
+アプリからワークスペースを開くと、`workspace.json` と参照されるブックファイルをまとめて読み込みます。保存ボタンまたは自動保存により同じファイルへ書き戻されます。
+
+## アプリの操作
+
+- `ワークスペースを開く`: ワークスペースフォルダを選択して読み込みます。
+- `保存`: 編集内容をすべての JSON ファイルへ書き戻します。
+- `自動保存`: デフォルトで有効（Tauri 実行時のみ）になっており、変更が検知されると短い遅延の後に保存します。
+- ブラウザプレビュー（`bun run dev`）ではファイルシステムへアクセスできないため、サンプルデータ表示のみになります。
+
+## 開発向けスクリプト
+
+```bash
+# サンプルデータが JSON Schema を満たすかを検証
+bun run validate:schema
+
+# ローカルにワークスペース/ブックを作成して I/O をお試し
+bun run demo:io
+bun run demo:workspace
+```
+
+## 今後の予定（抜粋）
+
+- ブック/シートの CRUD やドラッグ＆ドロップを含むサイドバー強化
+- セル編集・Undo/Redo・コピー＆ペースト対応
+- ショートカットやテーマ切り替えなどの操作性向上
+- 自動テストおよびドキュメント整備による初回リリース準備
