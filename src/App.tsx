@@ -7,6 +7,7 @@ import {
   saveWorkspaceSnapshot,
   showErrorDialog
 } from './lib/tauri/workspaceBridge';
+import { buildNewBookSnapshot } from './lib/workspace/bookFactory';
 import { sampleWorkspace, sampleBook } from './samples/sampleData';
 import type { WorkspaceSnapshot } from './types/workspaceSnapshot';
 import type { BookFile } from './types/schema';
@@ -128,6 +129,60 @@ function App() {
     setSelectedSheetId(sheetId);
   }, []);
 
+  const createDefaultBookName = useCallback(
+    (currentSnapshot: WorkspaceSnapshot): string => {
+      const base = '新しいブック';
+      const existingNames = new Set(
+        currentSnapshot.books.map((entry) => entry.data.book.name ?? entry.data.book.id)
+      );
+
+      if (!existingNames.has(base)) {
+        return base;
+      }
+
+      let counter = 2;
+      while (existingNames.has(`${base} (${counter})`)) {
+        counter += 1;
+      }
+      return `${base} (${counter})`;
+    },
+    []
+  );
+
+  const handleCreateBook = useCallback(async () => {
+    if (!snapshot) {
+      await showErrorDialog('ブックを作成できません', 'ワークスペースを開いてから新規ブックを作成してください。');
+      return;
+    }
+
+    try {
+      const desiredName = createDefaultBookName(snapshot);
+      const { workspaceData, loadedBook, defaultSheetId } = buildNewBookSnapshot(desiredName, snapshot);
+
+      const nextSnapshot: WorkspaceSnapshot = {
+        workspace: { filePath: snapshot.workspace.filePath, data: workspaceData },
+        books: [...snapshot.books, loadedBook]
+      };
+
+      setSnapshot(nextSnapshot);
+      setSelectedBookId(loadedBook.data.book.id);
+      setSelectedSheetId(defaultSheetId);
+
+      if (isTauri && !autoSaveEnabled) {
+        setBusyState('saving');
+        try {
+          await saveWorkspaceSnapshot(nextSnapshot);
+        } catch (error) {
+          await showErrorDialog('ブックの保存に失敗しました', toErrorMessage(error));
+        } finally {
+          setBusyState('idle');
+        }
+      }
+    } catch (error) {
+      await showErrorDialog('ブックの作成に失敗しました', toErrorMessage(error));
+    }
+  }, [snapshot, autoSaveEnabled, createDefaultBookName]);
+
   const renderEmptyState = () => (
     <div className="main-view__empty">
       <h2>ワークスペースを開いてください</h2>
@@ -158,6 +213,7 @@ function App() {
         selectedSheetId={selectedSheetId}
         onSelectBook={handleSelectBook}
         onSelectSheet={handleSelectSheet}
+        onCreateBook={handleCreateBook}
       />
       <section className="main-view">
         <header className="main-view__header">
