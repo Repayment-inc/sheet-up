@@ -9,6 +9,7 @@ interface SidebarProps {
   onSelectBook: (bookId: string) => void;
   onSelectSheet: (bookId: string, sheetId: string) => void;
   onCreateBook?: () => void;
+  onCreateSheet?: (bookId: string) => void;
 }
 
 const trimExtension = (name: string): string => name.replace(/\.json$/i, '');
@@ -20,7 +21,8 @@ const Sidebar: FC<SidebarProps> = ({
   selectedSheetId,
   onSelectBook,
   onSelectSheet,
-  onCreateBook
+  onCreateBook,
+  onCreateSheet
 }) => {
   const booksById = useMemo(() => new Map(books.map((book) => [book.book.id, book])), [books]);
   const workspaceMeta = workspace?.workspace;
@@ -74,6 +76,17 @@ const Sidebar: FC<SidebarProps> = ({
                     {book.sheets.length === 0 && (
                       <li className="sidebar__empty">シートがありません</li>
                     )}
+                    <li>
+                      <button
+                        type="button"
+                        className="sidebar__sheetAddButton"
+                        disabled={!onCreateSheet}
+                        onClick={() => onCreateSheet?.(bookRef.id)}
+                        title="このブックに新しいシートを追加"
+                      >
+                        + 新しいシート
+                      </button>
+                    </li>
                   </ul>
                 ) : null}
               </li>
