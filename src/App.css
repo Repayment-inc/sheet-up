@@ -386,10 +386,37 @@ button {
 
 .sheet-grid__cell {
   background: #ffffff;
+  position: relative;
 }
 
 .sheet-grid__table tbody tr:nth-child(even) .sheet-grid__cell {
   background: #f9fafb;
+}
+
+.sheet-grid__cell--selected {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.sheet-grid__cell--editing {
+  padding: 0;
+}
+
+.sheet-grid__cellInput {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  padding: 6px 8px;
+  font: inherit;
+  background: #ffffff;
+}
+
+.sheet-grid__colHeader--active,
+.sheet-grid__rowHeader--active {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
 }
 
 .sheet-grid__empty,

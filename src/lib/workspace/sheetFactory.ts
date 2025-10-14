@@ -37,11 +37,8 @@ export const buildNewSheetSnapshot = (
 ): { bookFile: BookFile; defaultSheetId: string } => {
   const name = createDefaultSheetName(bookFile);
   const newSheet = createEmptySheet(name);
-
   const sheets = [...bookFile.sheets, newSheet];
-
   const now = new Date().toISOString();
-
   return {
     bookFile: {
       ...bookFile,
