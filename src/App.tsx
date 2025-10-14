@@ -187,40 +187,36 @@ function App() {
   const handleCreateSheet = useCallback(
     async (bookId: string) => {
       if (!snapshot) {
-        await showErrorDialog(
-          'シートを作成できません',
-          'ワークスペースを開いてからシートを追加してください。'
-        );
+        await showErrorDialog('シートを作成できません', 'ワークスペースを開いてからシートを追加してください。');
         return;
       }
 
-      const bookSnapshot = snapshot.books.find((book) => book.data.book.id === bookId);
-      if (!bookSnapshot) {
+      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === bookId);
+      if (bookIndex === -1) {
         await showErrorDialog('シートを作成できません', '指定されたブックが見つかりません。');
         return;
       }
 
       try {
-        const { bookFile, defaultSheetId } = buildNewSheetSnapshot(bookSnapshot.data);
-        const updatedBooks = snapshot.books.map((book) =>
-          book.data.book.id === bookId ? { ...book, data: bookFile } : book
+        const { bookFile, defaultSheetId } = buildNewSheetSnapshot(snapshot.books[bookIndex].data);
+        const nextBooks = snapshot.books.map((entry, index) =>
+          index === bookIndex ? { ...entry, data: bookFile } : entry
         );
 
         const now = new Date().toISOString();
-        const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
-          ref.id === bookId ? { ...ref, activeSheetId: defaultSheetId, updatedAt: now } : ref
-        );
-
         const previousSettings = snapshot.workspace.data.workspace.settings ?? {};
+        const updatedRecentBookIds = [
+          bookId,
+          ...((previousSettings.recentBookIds ?? []).filter((id) => id !== bookId))
+        ].slice(0, 20);
         const updatedRecentSheetIds = [
           defaultSheetId,
           ...((previousSettings.recentSheetIds ?? []).filter((id) => id !== defaultSheetId))
         ].slice(0, 20);
 
-        const updatedRecentBookIds = [
-          bookId,
-          ...((previousSettings.recentBookIds ?? []).filter((id) => id !== bookId))
-        ].slice(0, 20);
+        const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
+          ref.id === bookId ? { ...ref, activeSheetId: defaultSheetId, updatedAt: now } : ref
+        );
 
         const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
           ...snapshot.workspace.data,
@@ -238,7 +234,7 @@ function App() {
 
         const nextSnapshot: WorkspaceSnapshot = {
           workspace: { ...snapshot.workspace, data: workspaceData },
-          books: updatedBooks
+          books: nextBooks
         };
 
         setSnapshot(nextSnapshot);
@@ -262,6 +258,119 @@ function App() {
     [snapshot, autoSaveEnabled]
   );
 
+  const handleCommitCell = useCallback(
+    async (rowKey: string, columnKey: string, rawValue: string) => {
+      if (!snapshot || !selectedBookId || !selectedSheetId) {
+        return;
+      }
+
+      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === selectedBookId);
+      if (bookIndex === -1) {
+        return;
+      }
+
+      const bookEntry = snapshot.books[bookIndex];
+      const sheetIndex = bookEntry.data.sheets.findIndex((sheet) => sheet.id === selectedSheetId);
+      if (sheetIndex === -1) {
+        return;
+      }
+
+      try {
+        const targetSheet = bookEntry.data.sheets[sheetIndex];
+        const nextRows = { ...targetSheet.rows };
+        const nextRowData = { ...(nextRows[rowKey] ?? {}) };
+
+        const trimmed = rawValue.trim();
+        if (trimmed === '') {
+          delete nextRowData[columnKey];
+        } else {
+          const numeric = Number(trimmed);
+          if (!Number.isNaN(numeric) && trimmed !== '') {
+            nextRowData[columnKey] = { value: numeric, type: 'number' };
+          } else {
+            nextRowData[columnKey] = { value: rawValue, type: 'string' };
+          }
+        }
+
+        if (Object.keys(nextRowData).length === 0) {
+          delete nextRows[rowKey];
+        } else {
+          nextRows[rowKey] = nextRowData;
+        }
+
+        const nextSheets = [...bookEntry.data.sheets];
+        nextSheets[sheetIndex] = {
+          ...targetSheet,
+          rows: nextRows
+        };
+
+        const now = new Date().toISOString();
+        const updatedBookData = {
+          ...bookEntry.data,
+          book: {
+            ...bookEntry.data.book,
+            updatedAt: now
+          },
+          sheets: nextSheets
+        };
+
+        const nextBooks = snapshot.books.map((entry, index) =>
+          index === bookIndex ? { ...entry, data: updatedBookData } : entry
+        );
+
+        const previousSettings = snapshot.workspace.data.workspace.settings ?? {};
+        const updatedRecentBookIds = [
+          selectedBookId,
+          ...((previousSettings.recentBookIds ?? []).filter((id) => id !== selectedBookId))
+        ].slice(0, 20);
+        const updatedRecentSheetIds = [
+          selectedSheetId,
+          ...((previousSettings.recentSheetIds ?? []).filter((id) => id !== selectedSheetId))
+        ].slice(0, 20);
+
+        const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
+          ref.id === selectedBookId
+            ? { ...ref, activeSheetId: selectedSheetId, updatedAt: now }
+            : ref
+        );
+
+        const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
+          ...snapshot.workspace.data,
+          workspace: {
+            ...snapshot.workspace.data.workspace,
+            updatedAt: now,
+            settings: {
+              ...previousSettings,
+              recentBookIds: updatedRecentBookIds,
+              recentSheetIds: updatedRecentSheetIds
+            }
+          },
+          books: updatedWorkspaceBooks
+        };
+
+        const nextSnapshot: WorkspaceSnapshot = {
+          workspace: { ...snapshot.workspace, data: workspaceData },
+          books: nextBooks
+        };
+
+        setSnapshot(nextSnapshot);
+
+        if (isTauri && !autoSaveEnabled) {
+          setBusyState('saving');
+          try {
+            await saveWorkspaceSnapshot(nextSnapshot);
+          } catch (error) {
+            await showErrorDialog('セルの保存に失敗しました', toErrorMessage(error));
+          } finally {
+            setBusyState('idle');
+          }
+        }
+      } catch (error) {
+        await showErrorDialog('セルの編集に失敗しました', toErrorMessage(error));
+      }
+    },
+    [snapshot, selectedBookId, selectedSheetId, autoSaveEnabled]
+  );
   const renderEmptyState = () => (
     <div className="main-view__empty">
       <h2>ワークスペースを開いてください</h2>
@@ -346,7 +455,11 @@ function App() {
           </div>
         </header>
         <div className="main-view__content">
-          {snapshot ? <SheetGrid sheet={activeSheet ?? null} /> : renderEmptyState()}
+          {snapshot ? (
+            <SheetGrid sheet={activeSheet ?? null} onCommitCell={handleCommitCell} />
+          ) : (
+            renderEmptyState()
+          )}
         </div>
       </section>
     </div>
