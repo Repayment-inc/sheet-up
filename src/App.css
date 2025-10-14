@@ -103,6 +103,28 @@ button {
   gap: 2px;
 }
 
+.sidebar__sheetAddButton {
+  width: 100%;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(249, 250, 251, 0.08);
+  color: rgba(249, 250, 251, 0.8);
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar__sheetAddButton:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #f9fafb;
+}
+
+.sidebar__sheetAddButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .sidebar__sheetButton {
   width: 100%;
   padding: 4px 6px;

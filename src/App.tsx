@@ -8,6 +8,7 @@ import {
   showErrorDialog
 } from './lib/tauri/workspaceBridge';
 import { buildNewBookSnapshot } from './lib/workspace/bookFactory';
+import { buildNewSheetSnapshot } from './lib/workspace/sheetFactory';
 import { sampleWorkspace, sampleBook } from './samples/sampleData';
 import type { WorkspaceSnapshot } from './types/workspaceSnapshot';
 import type { BookFile } from './types/schema';
@@ -183,6 +184,84 @@ function App() {
     }
   }, [snapshot, autoSaveEnabled, createDefaultBookName]);
 
+  const handleCreateSheet = useCallback(
+    async (bookId: string) => {
+      if (!snapshot) {
+        await showErrorDialog(
+          'シートを作成できません',
+          'ワークスペースを開いてからシートを追加してください。'
+        );
+        return;
+      }
+
+      const bookSnapshot = snapshot.books.find((book) => book.data.book.id === bookId);
+      if (!bookSnapshot) {
+        await showErrorDialog('シートを作成できません', '指定されたブックが見つかりません。');
+        return;
+      }
+
+      try {
+        const { bookFile, defaultSheetId } = buildNewSheetSnapshot(bookSnapshot.data);
+        const updatedBooks = snapshot.books.map((book) =>
+          book.data.book.id === bookId ? { ...book, data: bookFile } : book
+        );
+
+        const now = new Date().toISOString();
+        const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
+          ref.id === bookId ? { ...ref, activeSheetId: defaultSheetId, updatedAt: now } : ref
+        );
+
+        const previousSettings = snapshot.workspace.data.workspace.settings ?? {};
+        const updatedRecentSheetIds = [
+          defaultSheetId,
+          ...((previousSettings.recentSheetIds ?? []).filter((id) => id !== defaultSheetId))
+        ].slice(0, 20);
+
+        const updatedRecentBookIds = [
+          bookId,
+          ...((previousSettings.recentBookIds ?? []).filter((id) => id !== bookId))
+        ].slice(0, 20);
+
+        const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
+          ...snapshot.workspace.data,
+          workspace: {
+            ...snapshot.workspace.data.workspace,
+            updatedAt: now,
+            settings: {
+              ...previousSettings,
+              recentBookIds: updatedRecentBookIds,
+              recentSheetIds: updatedRecentSheetIds
+            }
+          },
+          books: updatedWorkspaceBooks
+        };
+
+        const nextSnapshot: WorkspaceSnapshot = {
+          workspace: { ...snapshot.workspace, data: workspaceData },
+          books: updatedBooks
+        };
+
+        setSnapshot(nextSnapshot);
+        setSelectedBookId(bookId);
+        setSelectedSheetId(defaultSheetId);
+
+        if (isTauri && !autoSaveEnabled) {
+          setBusyState('saving');
+          try {
+            await saveWorkspaceSnapshot(nextSnapshot);
+          } catch (error) {
+            await showErrorDialog('シートの保存に失敗しました', toErrorMessage(error));
+          } finally {
+            setBusyState('idle');
+          }
+        }
+      } catch (error) {
+        await showErrorDialog('シートの作成に失敗しました', toErrorMessage(error));
+      }
+    },
+    [snapshot, autoSaveEnabled]
+  );
+
   const renderEmptyState = () => (
     <div className="main-view__empty">
       <h2>ワークスペースを開いてください</h2>
@@ -214,6 +293,7 @@ function App() {
         onSelectBook={handleSelectBook}
         onSelectSheet={handleSelectSheet}
         onCreateBook={handleCreateBook}
+        onCreateSheet={handleCreateSheet}
       />
       <section className="main-view">
         <header className="main-view__header">
