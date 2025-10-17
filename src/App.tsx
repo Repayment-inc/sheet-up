@@ -255,12 +255,12 @@ function App() {
         await showErrorDialog('シートの作成に失敗しました', toErrorMessage(error));
       }
     },
-    [snapshot, autoSaveEnabled]
+    [snapshot, autoSaveEnabled, showErrorDialog]
   );
 
-  const handleCommitCell = useCallback(
-    async (rowKey: string, columnKey: string, rawValue: string) => {
-      if (!snapshot || !selectedBookId || !selectedSheetId) {
+  const applyCellUpdates = useCallback(
+    async (updates: Array<{ rowKey: string; columnKey: string; value: string }>) => {
+      if (!snapshot || !selectedBookId || !selectedSheetId || updates.length === 0) {
         return;
       }
 
@@ -278,25 +278,27 @@ function App() {
       try {
         const targetSheet = bookEntry.data.sheets[sheetIndex];
         const nextRows = { ...targetSheet.rows };
-        const nextRowData = { ...(nextRows[rowKey] ?? {}) };
 
-        const trimmed = rawValue.trim();
-        if (trimmed === '') {
-          delete nextRowData[columnKey];
-        } else {
-          const numeric = Number(trimmed);
-          if (!Number.isNaN(numeric) && trimmed !== '') {
-            nextRowData[columnKey] = { value: numeric, type: 'number' };
+        updates.forEach(({ rowKey, columnKey, value }) => {
+          const nextRowData = { ...(nextRows[rowKey] ?? {}) };
+          const trimmed = value.trim();
+          if (trimmed === '') {
+            delete nextRowData[columnKey];
           } else {
-            nextRowData[columnKey] = { value: rawValue, type: 'string' };
+            const numeric = Number(trimmed);
+            if (!Number.isNaN(numeric) && trimmed !== '') {
+              nextRowData[columnKey] = { value: numeric, type: 'number' };
+            } else {
+              nextRowData[columnKey] = { value, type: 'string' };
+            }
           }
-        }
 
-        if (Object.keys(nextRowData).length === 0) {
-          delete nextRows[rowKey];
-        } else {
-          nextRows[rowKey] = nextRowData;
-        }
+          if (Object.keys(nextRowData).length === 0) {
+            delete nextRows[rowKey];
+          } else {
+            nextRows[rowKey] = nextRowData;
+          }
+        });
 
         const nextSheets = [...bookEntry.data.sheets];
         nextSheets[sheetIndex] = {
@@ -369,7 +371,21 @@ function App() {
         await showErrorDialog('セルの編集に失敗しました', toErrorMessage(error));
       }
     },
-    [snapshot, selectedBookId, selectedSheetId, autoSaveEnabled]
+    [snapshot, selectedBookId, selectedSheetId, autoSaveEnabled, isTauri, showErrorDialog]
+  );
+
+  const handleCommitCell = useCallback(
+    (rowKey: string, columnKey: string, rawValue: string) => {
+      void applyCellUpdates([{ rowKey, columnKey, value: rawValue }]);
+    },
+    [applyCellUpdates]
+  );
+
+  const handleCommitCells = useCallback(
+    (updates: Array<{ rowKey: string; columnKey: string; value: string }>) => {
+      void applyCellUpdates(updates);
+    },
+    [applyCellUpdates]
   );
   const renderEmptyState = () => (
     <div className="main-view__empty">
@@ -456,7 +472,11 @@ function App() {
         </header>
         <div className="main-view__content">
           {snapshot ? (
-            <SheetGrid sheet={activeSheet ?? null} onCommitCell={handleCommitCell} />
+            <SheetGrid
+              sheet={activeSheet ?? null}
+              onCommitCell={handleCommitCell}
+              onCommitCells={handleCommitCells}
+            />
           ) : (
             renderEmptyState()
           )}

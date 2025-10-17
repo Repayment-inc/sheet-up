@@ -396,7 +396,15 @@ button {
 .sheet-grid__cell--selected {
   outline: 2px solid #2563eb;
   outline-offset: -2px;
-  background: rgba(37, 99, 235, 0.08);
+  background: rgba(37, 99, 235, 0.18);
+}
+
+.sheet-grid__cell--inRange {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.sheet-grid__table tbody tr:nth-child(even) .sheet-grid__cell--inRange {
+  background: rgba(37, 99, 235, 0.15);
 }
 
 .sheet-grid__cell--editing {
