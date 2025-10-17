@@ -21,6 +21,21 @@ const sampleSnapshot: WorkspaceSnapshot = {
 
 type BusyState = 'idle' | 'loading' | 'saving';
 
+const MAX_HISTORY_ENTRIES = 100;
+
+type HistoryEntry = {
+  snapshot: WorkspaceSnapshot;
+  selectedBookId: string | null;
+  selectedSheetId: string | null;
+};
+
+const cloneSnapshot = <T,>(value: T): T => {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
+};
+
 const toErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
@@ -30,11 +45,64 @@ function App() {
   const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null);
   const [busyState, setBusyState] = useState<BusyState>('idle');
   const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(isTauri);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [future, setFuture] = useState<HistoryEntry[]>([]);
 
   const snapshotRef = useRef<WorkspaceSnapshot | null>(snapshot);
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+
+  const recordSnapshotForUndo = useCallback(() => {
+    if (!snapshot) return;
+    const entry: HistoryEntry = {
+      snapshot: cloneSnapshot(snapshot),
+      selectedBookId,
+      selectedSheetId
+    };
+    setHistory((prev) => {
+      const next = [...prev, entry];
+      if (next.length > MAX_HISTORY_ENTRIES) {
+        return next.slice(next.length - MAX_HISTORY_ENTRIES);
+      }
+      return next;
+    });
+    setFuture([]);
+  }, [snapshot, selectedBookId, selectedSheetId]);
+
+  const handleUndo = useCallback(() => {
+    if (!snapshot || history.length === 0) return;
+    const lastEntry = history[history.length - 1];
+    setHistory((prev) => prev.slice(0, -1));
+    setFuture((prev) => [
+      ...prev,
+      {
+        snapshot: cloneSnapshot(snapshot),
+        selectedBookId,
+        selectedSheetId
+      }
+    ]);
+    setSnapshot(lastEntry.snapshot);
+    setSelectedBookId(lastEntry.selectedBookId);
+    setSelectedSheetId(lastEntry.selectedSheetId);
+  }, [history, snapshot, selectedBookId, selectedSheetId]);
+
+  const handleRedo = useCallback(() => {
+    if (!snapshot || future.length === 0) return;
+    const nextEntry = future[future.length - 1];
+    setFuture((prev) => prev.slice(0, -1));
+    setHistory((prev) => [
+      ...prev,
+      {
+        snapshot: cloneSnapshot(snapshot),
+        selectedBookId,
+        selectedSheetId
+      }
+    ]);
+    setSnapshot(nextEntry.snapshot);
+    setSelectedBookId(nextEntry.selectedBookId);
+    setSelectedSheetId(nextEntry.selectedSheetId);
+  }, [future, snapshot, selectedBookId, selectedSheetId]);
 
   const initializeSelection = useCallback((nextSnapshot: WorkspaceSnapshot) => {
     const fallbackBookFromWorkspace = nextSnapshot.workspace.data.books[0]?.id ?? null;
@@ -157,6 +225,7 @@ function App() {
     }
 
     try {
+      recordSnapshotForUndo();
       const desiredName = createDefaultBookName(snapshot);
       const { workspaceData, loadedBook, defaultSheetId } = buildNewBookSnapshot(desiredName, snapshot);
 
@@ -182,7 +251,7 @@ function App() {
     } catch (error) {
       await showErrorDialog('ブックの作成に失敗しました', toErrorMessage(error));
     }
-  }, [snapshot, autoSaveEnabled, createDefaultBookName]);
+  }, [snapshot, autoSaveEnabled, createDefaultBookName, isTauri, recordSnapshotForUndo, showErrorDialog]);
 
   const handleCreateSheet = useCallback(
     async (bookId: string) => {
@@ -198,6 +267,7 @@ function App() {
       }
 
       try {
+        recordSnapshotForUndo();
         const { bookFile, defaultSheetId } = buildNewSheetSnapshot(snapshot.books[bookIndex].data);
         const nextBooks = snapshot.books.map((entry, index) =>
           index === bookIndex ? { ...entry, data: bookFile } : entry
@@ -255,7 +325,7 @@ function App() {
         await showErrorDialog('シートの作成に失敗しました', toErrorMessage(error));
       }
     },
-    [snapshot, autoSaveEnabled, showErrorDialog]
+    [snapshot, autoSaveEnabled, showErrorDialog, recordSnapshotForUndo, isTauri]
   );
 
   const applyCellUpdates = useCallback(
@@ -276,6 +346,7 @@ function App() {
       }
 
       try {
+        recordSnapshotForUndo();
         const targetSheet = bookEntry.data.sheets[sheetIndex];
         const nextRows = { ...targetSheet.rows };
 
@@ -371,7 +442,7 @@ function App() {
         await showErrorDialog('セルの編集に失敗しました', toErrorMessage(error));
       }
     },
-    [snapshot, selectedBookId, selectedSheetId, autoSaveEnabled, isTauri, showErrorDialog]
+    [snapshot, selectedBookId, selectedSheetId, autoSaveEnabled, isTauri, showErrorDialog, recordSnapshotForUndo]
   );
 
   const handleCommitCell = useCallback(
@@ -387,6 +458,30 @@ function App() {
     },
     [applyCellUpdates]
   );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const isMeta = event.metaKey || event.ctrlKey;
+      if (!isMeta) return;
+
+      const key = event.key.toLowerCase();
+      if (key === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if (key === 'y') {
+        event.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
   const renderEmptyState = () => (
     <div className="main-view__empty">
       <h2>ワークスペースを開いてください</h2>
