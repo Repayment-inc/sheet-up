@@ -29,6 +29,24 @@ const toColumnLabel = (index: number): string => {
   return label;
 };
 
+const fromColumnLabel = (label: string): number | null => {
+  if (!label) {
+    return null;
+  }
+  let result = 0;
+  const normalized = label.toUpperCase();
+
+  for (let i = 0; i < normalized.length; i += 1) {
+    const code = normalized.charCodeAt(i) - 65;
+    if (code < 0 || code > 25) {
+      return null;
+    }
+    result = result * 26 + (code + 1);
+  }
+
+  return result - 1;
+};
+
 type CellPosition = {
   rowKey: string;
   columnKey: string;
@@ -37,13 +55,25 @@ type CellPosition = {
 const SheetGrid: FC<SheetGridProps> = ({ sheet, onCommitCell, onCommitCells }) => {
   const columnLabels = useMemo(() => {
     if (!sheet) return [];
-    const count = Math.min(sheet.gridSize.cols, 26);
-    return Array.from({ length: count }, (_, idx) => toColumnLabel(idx));
+    const baseCount = Math.max(sheet.gridSize.cols, 0);
+
+    let maxSparseIndex = -1;
+    Object.values(sheet.rows).forEach((row) => {
+      Object.keys(row).forEach((key) => {
+        const index = fromColumnLabel(key);
+        if (index !== null) {
+          maxSparseIndex = Math.max(maxSparseIndex, index);
+        }
+      });
+    });
+
+    const effectiveCount = Math.max(baseCount, maxSparseIndex + 1);
+    return Array.from({ length: effectiveCount }, (_, idx) => toColumnLabel(idx));
   }, [sheet]);
 
   const rowNumbers = useMemo(() => {
     if (!sheet) return [];
-    const baseCount = Math.min(sheet.gridSize.rows, 30);
+    const baseCount = Math.max(sheet.gridSize.rows, 0);
     const baseRows = Array.from({ length: baseCount }, (_, idx) => idx + 1);
     const sparseRows = Object.keys(sheet.rows)
       .map((key) => Number.parseInt(key, 10))
