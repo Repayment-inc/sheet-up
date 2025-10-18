@@ -278,31 +278,52 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         return null;
       }
 
-      recordSnapshotForUndo();
-
       const targetSheet = bookEntry.data.sheets[sheetIndex];
-      const nextRows = { ...targetSheet.rows };
+      const currentRows = targetSheet.rows ?? {};
+      const nextRows = { ...currentRows };
+
+      let hasEffectiveChange = false;
 
       updates.forEach(({ rowKey, columnKey, value }) => {
+        const currentRowData = currentRows[rowKey] ?? {};
+        const currentCell = currentRowData[columnKey];
         const nextRowData = { ...(nextRows[rowKey] ?? {}) };
         const trimmed = value.trim();
+
         if (trimmed === '') {
+          if (currentCell !== undefined) {
+            hasEffectiveChange = true;
+          }
           delete nextRowData[columnKey];
         } else {
           const numeric = Number(trimmed);
           if (!Number.isNaN(numeric) && trimmed !== '') {
+            if (!currentCell || currentCell.type !== 'number' || currentCell.value !== numeric) {
+              hasEffectiveChange = true;
+            }
             nextRowData[columnKey] = { value: numeric, type: 'number' };
           } else {
+            if (!currentCell || currentCell.type !== 'string' || currentCell.value !== value) {
+              hasEffectiveChange = true;
+            }
             nextRowData[columnKey] = { value, type: 'string' };
           }
         }
 
         if (Object.keys(nextRowData).length === 0) {
-          delete nextRows[rowKey];
+          if (nextRows[rowKey] !== undefined) {
+            delete nextRows[rowKey];
+          }
         } else {
           nextRows[rowKey] = nextRowData;
         }
       });
+
+      if (!hasEffectiveChange) {
+        return null;
+      }
+
+      recordSnapshotForUndo();
 
       const nextSheets = [...bookEntry.data.sheets];
       nextSheets[sheetIndex] = {
