@@ -111,8 +111,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
     });
   };
 
-  const resetHistory = () => set({ history: [], future: [] });
-
   const applySelectionAfterSnapshot = (snapshot: WorkspaceSnapshot | null) => {
     if (!snapshot) {
       set({ selectedBookId: null, selectedSheetId: null });
@@ -138,15 +136,19 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       set({
         snapshot: null,
         selectedBookId: null,
-        selectedSheetId: null
+        selectedSheetId: null,
+        history: [],
+        future: []
       });
-      resetHistory();
     },
 
     loadWorkspace: (snapshot) => {
-      set({ snapshot });
+      set({
+        snapshot,
+        history: [],
+        future: []
+      });
       applySelectionAfterSnapshot(snapshot);
-      resetHistory();
     },
 
     selectBook: (bookId) => {
