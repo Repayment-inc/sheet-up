@@ -257,4 +257,17 @@ const SheetGrid: FC<SheetGridProps> = ({ sheet, onCommitCell, onCommitCells }) =
   const isSelected = (rowKey: string, columnKey: string): boolean =>
     selectedCell?.rowKey === rowKey && selectedCell?.columnKey === columnKey;
 
+  const isInSelectionRange = (rowKey: string, columnKey: string): boolean => {
+    if (!selectionRange) return false;
+    const startPos = getCellPosition(selectionRange.start.rowKey, selectionRange.start.columnKey);
+    const endPos = getCellPosition(selectionRange.end.rowKey, selectionRange.end.columnKey);
+    const cellPos = getCellPosition(rowKey, columnKey);
+    if (!startPos || !endPos || !cellPos) return false;
+    const rowMin = Math.min(startPos.rowIndex, endPos.rowIndex);
+    const rowMax = Math.max(startPos.rowIndex, endPos.rowIndex);
+    const colMin = Math.min(startPos.colIndex, endPos.colIndex);
+    const colMax = Math.max(startPos.colIndex, endPos.colIndex);
+    return cellPos.rowIndex >= rowMin && cellPos.rowIndex <= rowMax && cellPos.colIndex >= colMin && cellPos.colIndex <= colMax;
+  };
+
 *** End Patch to src/components/SheetGrid.tsx...
