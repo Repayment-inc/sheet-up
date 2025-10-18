@@ -8,6 +8,9 @@ const DEFAULT_COLS = 26;
 
 const normalizeName = (name: string): string => name.trim();
 
+const buildBookFileName = (bookName: string): string =>
+  `${bookName.replace(/\//g, '／')}.json`;
+
 const hasBackslash = (path: string): boolean => path.includes('\\');
 
 const normalizeSeparators = (value: string): string => value.replace(/\\/g, '/');
@@ -61,7 +64,8 @@ export const buildNewBookSnapshot = (
   const sheetId = generateId('sheet');
 
   const workspaceDir = resolveWorkspaceDir(snapshot.workspace.filePath);
-  const dataPath = `${BOOKS_DIR}/${bookId}.json`;
+  const fileName = buildBookFileName(trimmedName);
+  const dataPath = `${BOOKS_DIR}/${fileName}`;
   const absoluteBookPath = joinWorkspacePath(workspaceDir, dataPath);
 
   const bookFile: BookFile = {
@@ -91,7 +95,7 @@ export const buildNewBookSnapshot = (
 
   const bookReference: BookReference = {
     id: bookId,
-    name: `${bookId}.json`,
+    name: buildBookFileName(trimmedName),
     folderId: null,
     order: nextOrder,
     dataPath,
