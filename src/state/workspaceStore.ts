@@ -226,9 +226,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       ].slice(0, 20);
 
       const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
-        ref.id === bookId
-          ? { ...ref, activeSheetId: defaultSheetId, updatedAt: now }
-          : ref
+        ref.id === bookId ? { ...ref, activeSheetId: defaultSheetId, updatedAt: now } : ref
       );
 
       const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
@@ -247,9 +245,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
 
       const nextSnapshot: WorkspaceSnapshot = {
         workspace: { ...snapshot.workspace, data: workspaceData },
-        books: snapshot.books.map((entry, index) =>
-          index === bookIndex ? { ...entry, data: { ...snapshot.books[bookIndex].data, sheets: bookFile.sheets } } : entry
-        )
+        books: nextBooks
       };
 
       set({
@@ -262,12 +258,14 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
     },
 
     applyCellUpdates: (updates) => {
+      if (updates.length === 0) {
+        return null;
+      }
+
       const { snapshot, selectedBookId, selectedSheetId } = get();
       if (!snapshot || !selectedBookId || !selectedSheetId) {
         return null;
       }
-
-      recordSnapshotForUndo();
 
       const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === selectedBookId);
       if (bookIndex === -1) {
@@ -275,13 +273,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       }
 
       const bookEntry = snapshot.books[bookIndex];
-      const sheetIndex = bookEntry.data.sheets.findIndex((sheet) => sheet.sheet.id === selectedSheetId);
+      const sheetIndex = bookEntry.data.sheets.findIndex((sheet) => sheet.id === selectedSheetId);
       if (sheetIndex === -1) {
         return null;
       }
 
+      recordSnapshotForUndo();
+
       const targetSheet = bookEntry.data.sheets[sheetIndex];
-      const nextRows = structuredClone(targetSheet.rows ?? {});
+      const nextRows = { ...targetSheet.rows };
 
       updates.forEach(({ rowKey, columnKey, value }) => {
         const nextRowData = { ...(nextRows[rowKey] ?? {}) };
