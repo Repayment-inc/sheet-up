@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import SheetGrid from './components/SheetGrid';
 import { isTauri } from './lib/env';
@@ -7,121 +7,30 @@ import {
   saveWorkspaceSnapshot,
   showErrorDialog
 } from './lib/tauri/workspaceBridge';
-import { buildNewBookSnapshot } from './lib/workspace/bookFactory';
-import { buildNewSheetSnapshot } from './lib/workspace/sheetFactory';
-import { sampleWorkspace, sampleBook } from './samples/sampleData';
-import type { WorkspaceSnapshot } from './types/workspaceSnapshot';
 import type { BookFile } from './types/schema';
+import { useWorkspaceStore, type CellUpdate } from './state/workspaceStore';
 import './App.css';
-
-const sampleSnapshot: WorkspaceSnapshot = {
-  workspace: { filePath: 'sample/workspace.json', data: sampleWorkspace },
-  books: [{ filePath: 'sample/books/book-001.json', data: sampleBook }]
-};
-
-type BusyState = 'idle' | 'loading' | 'saving';
-
-const MAX_HISTORY_ENTRIES = 100;
-
-type HistoryEntry = {
-  snapshot: WorkspaceSnapshot;
-  selectedBookId: string | null;
-  selectedSheetId: string | null;
-};
-
-const cloneSnapshot = <T,>(value: T): T => {
-  if (typeof structuredClone === 'function') {
-    return structuredClone(value);
-  }
-  return JSON.parse(JSON.stringify(value)) as T;
-};
 
 const toErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 function App() {
-  const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(isTauri ? null : sampleSnapshot);
-  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
-  const [selectedSheetId, setSelectedSheetId] = useState<string | null>(null);
-  const [busyState, setBusyState] = useState<BusyState>('idle');
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState<boolean>(isTauri);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [future, setFuture] = useState<HistoryEntry[]>([]);
+  const snapshot = useWorkspaceStore((state) => state.snapshot);
+  const selectedBookId = useWorkspaceStore((state) => state.selectedBookId);
+  const selectedSheetId = useWorkspaceStore((state) => state.selectedSheetId);
+  const busyState = useWorkspaceStore((state) => state.busyState);
+  const autoSaveEnabled = useWorkspaceStore((state) => state.autoSaveEnabled);
 
-  const snapshotRef = useRef<WorkspaceSnapshot | null>(snapshot);
-  useEffect(() => {
-    snapshotRef.current = snapshot;
-  }, [snapshot]);
-
-  const recordSnapshotForUndo = useCallback(() => {
-    if (!snapshot) return;
-    const entry: HistoryEntry = {
-      snapshot: cloneSnapshot(snapshot),
-      selectedBookId,
-      selectedSheetId
-    };
-    setHistory((prev) => {
-      const next = [...prev, entry];
-      if (next.length > MAX_HISTORY_ENTRIES) {
-        return next.slice(next.length - MAX_HISTORY_ENTRIES);
-      }
-      return next;
-    });
-    setFuture([]);
-  }, [snapshot, selectedBookId, selectedSheetId]);
-
-  const handleUndo = useCallback(() => {
-    if (!snapshot || history.length === 0) return;
-    const lastEntry = history[history.length - 1];
-    setHistory((prev) => prev.slice(0, -1));
-    setFuture((prev) => [
-      ...prev,
-      {
-        snapshot: cloneSnapshot(snapshot),
-        selectedBookId,
-        selectedSheetId
-      }
-    ]);
-    setSnapshot(lastEntry.snapshot);
-    setSelectedBookId(lastEntry.selectedBookId);
-    setSelectedSheetId(lastEntry.selectedSheetId);
-  }, [history, snapshot, selectedBookId, selectedSheetId]);
-
-  const handleRedo = useCallback(() => {
-    if (!snapshot || future.length === 0) return;
-    const nextEntry = future[future.length - 1];
-    setFuture((prev) => prev.slice(0, -1));
-    setHistory((prev) => [
-      ...prev,
-      {
-        snapshot: cloneSnapshot(snapshot),
-        selectedBookId,
-        selectedSheetId
-      }
-    ]);
-    setSnapshot(nextEntry.snapshot);
-    setSelectedBookId(nextEntry.selectedBookId);
-    setSelectedSheetId(nextEntry.selectedSheetId);
-  }, [future, snapshot, selectedBookId, selectedSheetId]);
-
-  const initializeSelection = useCallback((nextSnapshot: WorkspaceSnapshot) => {
-    const fallbackBookFromWorkspace = nextSnapshot.workspace.data.books[0]?.id ?? null;
-    const fallbackBookFromFiles = nextSnapshot.books[0]?.data.book.id ?? null;
-    const nextBookId = fallbackBookFromWorkspace ?? fallbackBookFromFiles;
-    const matchingBook = nextSnapshot.books.find((book) => book.data.book.id === nextBookId);
-    const nextSheetId = matchingBook?.data.sheets[0]?.id ?? null;
-
-    setSelectedBookId(nextBookId);
-    setSelectedSheetId(nextSheetId);
-  }, []);
-
-  const handleWorkspaceLoaded = useCallback(
-    (nextSnapshot: WorkspaceSnapshot) => {
-      setSnapshot(nextSnapshot);
-      initializeSelection(nextSnapshot);
-    },
-    [initializeSelection]
-  );
+  const loadWorkspace = useWorkspaceStore((state) => state.loadWorkspace);
+  const setBusyState = useWorkspaceStore((state) => state.setBusyState);
+  const setAutoSaveEnabled = useWorkspaceStore((state) => state.setAutoSaveEnabled);
+  const selectBook = useWorkspaceStore((state) => state.selectBook);
+  const selectSheet = useWorkspaceStore((state) => state.selectSheet);
+  const createBook = useWorkspaceStore((state) => state.createBook);
+  const createSheet = useWorkspaceStore((state) => state.createSheet);
+  const applyCellUpdates = useWorkspaceStore((state) => state.applyCellUpdates);
+  const undo = useWorkspaceStore((state) => state.undo);
+  const redo = useWorkspaceStore((state) => state.redo);
 
   const handleOpenWorkspace = useCallback(async () => {
     if (!isTauri) return;
@@ -129,26 +38,28 @@ function App() {
     try {
       const loaded = await openWorkspaceFromDialog();
       if (loaded) {
-        handleWorkspaceLoaded(loaded);
+        loadWorkspace(loaded);
       }
     } catch (error) {
       await showErrorDialog('ワークスペースの読み込みに失敗しました', toErrorMessage(error));
     } finally {
       setBusyState('idle');
     }
-  }, [handleWorkspaceLoaded]);
+  }, [loadWorkspace, setBusyState]);
 
   const handleSaveWorkspace = useCallback(async () => {
-    if (!snapshotRef.current || !isTauri) return;
+    if (!isTauri) return;
+    const currentSnapshot = useWorkspaceStore.getState().snapshot;
+    if (!currentSnapshot) return;
     setBusyState('saving');
     try {
-      await saveWorkspaceSnapshot(snapshotRef.current);
+      await saveWorkspaceSnapshot(currentSnapshot);
     } catch (error) {
       await showErrorDialog('保存に失敗しました', toErrorMessage(error));
     } finally {
       setBusyState('idle');
     }
-  }, []);
+  }, [setBusyState]);
 
   useEffect(() => {
     if (!autoSaveEnabled || !isTauri) {
@@ -185,58 +96,21 @@ function App() {
 
   const handleSelectBook = useCallback(
     (bookId: string) => {
-      setSelectedBookId(bookId);
-      const book = loadedBooks.find((entry) => entry.data.book.id === bookId);
-      const firstSheet = book?.data.sheets[0];
-      setSelectedSheetId(firstSheet ? firstSheet.id : null);
+      selectBook(bookId);
     },
-    [loadedBooks]
+    [selectBook]
   );
 
-  const handleSelectSheet = useCallback((bookId: string, sheetId: string) => {
-    setSelectedBookId(bookId);
-    setSelectedSheetId(sheetId);
-  }, []);
-
-  const createDefaultBookName = useCallback(
-    (currentSnapshot: WorkspaceSnapshot): string => {
-      const base = '新しいブック';
-      const existingNames = new Set(
-        currentSnapshot.books.map((entry) => entry.data.book.name ?? entry.data.book.id)
-      );
-
-      if (!existingNames.has(base)) {
-        return base;
-      }
-
-      let counter = 2;
-      while (existingNames.has(`${base} (${counter})`)) {
-        counter += 1;
-      }
-      return `${base} (${counter})`;
+  const handleSelectSheet = useCallback(
+    (bookId: string, sheetId: string) => {
+      selectSheet(bookId, sheetId);
     },
-    []
+    [selectSheet]
   );
 
   const handleCreateBook = useCallback(async () => {
-    if (!snapshot) {
-      await showErrorDialog('ブックを作成できません', 'ワークスペースを開いてから新規ブックを作成してください。');
-      return;
-    }
-
     try {
-      recordSnapshotForUndo();
-      const desiredName = createDefaultBookName(snapshot);
-      const { workspaceData, loadedBook, defaultSheetId } = buildNewBookSnapshot(desiredName, snapshot);
-
-      const nextSnapshot: WorkspaceSnapshot = {
-        workspace: { filePath: snapshot.workspace.filePath, data: workspaceData },
-        books: [...snapshot.books, loadedBook]
-      };
-
-      setSnapshot(nextSnapshot);
-      setSelectedBookId(loadedBook.data.book.id);
-      setSelectedSheetId(defaultSheetId);
+      const nextSnapshot = createBook();
 
       if (isTauri && !autoSaveEnabled) {
         setBusyState('saving');
@@ -251,65 +125,12 @@ function App() {
     } catch (error) {
       await showErrorDialog('ブックの作成に失敗しました', toErrorMessage(error));
     }
-  }, [snapshot, autoSaveEnabled, createDefaultBookName, isTauri, recordSnapshotForUndo, showErrorDialog]);
+  }, [autoSaveEnabled, createBook, setBusyState]);
 
   const handleCreateSheet = useCallback(
     async (bookId: string) => {
-      if (!snapshot) {
-        await showErrorDialog('シートを作成できません', 'ワークスペースを開いてからシートを追加してください。');
-        return;
-      }
-
-      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === bookId);
-      if (bookIndex === -1) {
-        await showErrorDialog('シートを作成できません', '指定されたブックが見つかりません。');
-        return;
-      }
-
       try {
-        recordSnapshotForUndo();
-        const { bookFile, defaultSheetId } = buildNewSheetSnapshot(snapshot.books[bookIndex].data);
-        const nextBooks = snapshot.books.map((entry, index) =>
-          index === bookIndex ? { ...entry, data: bookFile } : entry
-        );
-
-        const now = new Date().toISOString();
-        const previousSettings = snapshot.workspace.data.workspace.settings ?? {};
-        const updatedRecentBookIds = [
-          bookId,
-          ...((previousSettings.recentBookIds ?? []).filter((id) => id !== bookId))
-        ].slice(0, 20);
-        const updatedRecentSheetIds = [
-          defaultSheetId,
-          ...((previousSettings.recentSheetIds ?? []).filter((id) => id !== defaultSheetId))
-        ].slice(0, 20);
-
-        const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
-          ref.id === bookId ? { ...ref, activeSheetId: defaultSheetId, updatedAt: now } : ref
-        );
-
-        const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
-          ...snapshot.workspace.data,
-          workspace: {
-            ...snapshot.workspace.data.workspace,
-            updatedAt: now,
-            settings: {
-              ...previousSettings,
-              recentBookIds: updatedRecentBookIds,
-              recentSheetIds: updatedRecentSheetIds
-            }
-          },
-          books: updatedWorkspaceBooks
-        };
-
-        const nextSnapshot: WorkspaceSnapshot = {
-          workspace: { ...snapshot.workspace, data: workspaceData },
-          books: nextBooks
-        };
-
-        setSnapshot(nextSnapshot);
-        setSelectedBookId(bookId);
-        setSelectedSheetId(defaultSheetId);
+        const { snapshot: nextSnapshot } = createSheet(bookId);
 
         if (isTauri && !autoSaveEnabled) {
           setBusyState('saving');
@@ -325,108 +146,16 @@ function App() {
         await showErrorDialog('シートの作成に失敗しました', toErrorMessage(error));
       }
     },
-    [snapshot, autoSaveEnabled, showErrorDialog, recordSnapshotForUndo, isTauri]
+    [autoSaveEnabled, createSheet, setBusyState]
   );
 
-  const applyCellUpdates = useCallback(
-    async (updates: Array<{ rowKey: string; columnKey: string; value: string }>) => {
-      if (!snapshot || !selectedBookId || !selectedSheetId || updates.length === 0) {
-        return;
-      }
-
-      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === selectedBookId);
-      if (bookIndex === -1) {
-        return;
-      }
-
-      const bookEntry = snapshot.books[bookIndex];
-      const sheetIndex = bookEntry.data.sheets.findIndex((sheet) => sheet.id === selectedSheetId);
-      if (sheetIndex === -1) {
-        return;
-      }
-
+  const handleApplyCellUpdates = useCallback(
+    async (updates: CellUpdate[]) => {
       try {
-        recordSnapshotForUndo();
-        const targetSheet = bookEntry.data.sheets[sheetIndex];
-        const nextRows = { ...targetSheet.rows };
-
-        updates.forEach(({ rowKey, columnKey, value }) => {
-          const nextRowData = { ...(nextRows[rowKey] ?? {}) };
-          const trimmed = value.trim();
-          if (trimmed === '') {
-            delete nextRowData[columnKey];
-          } else {
-            const numeric = Number(trimmed);
-            if (!Number.isNaN(numeric) && trimmed !== '') {
-              nextRowData[columnKey] = { value: numeric, type: 'number' };
-            } else {
-              nextRowData[columnKey] = { value, type: 'string' };
-            }
-          }
-
-          if (Object.keys(nextRowData).length === 0) {
-            delete nextRows[rowKey];
-          } else {
-            nextRows[rowKey] = nextRowData;
-          }
-        });
-
-        const nextSheets = [...bookEntry.data.sheets];
-        nextSheets[sheetIndex] = {
-          ...targetSheet,
-          rows: nextRows
-        };
-
-        const now = new Date().toISOString();
-        const updatedBookData = {
-          ...bookEntry.data,
-          book: {
-            ...bookEntry.data.book,
-            updatedAt: now
-          },
-          sheets: nextSheets
-        };
-
-        const nextBooks = snapshot.books.map((entry, index) =>
-          index === bookIndex ? { ...entry, data: updatedBookData } : entry
-        );
-
-        const previousSettings = snapshot.workspace.data.workspace.settings ?? {};
-        const updatedRecentBookIds = [
-          selectedBookId,
-          ...((previousSettings.recentBookIds ?? []).filter((id) => id !== selectedBookId))
-        ].slice(0, 20);
-        const updatedRecentSheetIds = [
-          selectedSheetId,
-          ...((previousSettings.recentSheetIds ?? []).filter((id) => id !== selectedSheetId))
-        ].slice(0, 20);
-
-        const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
-          ref.id === selectedBookId
-            ? { ...ref, activeSheetId: selectedSheetId, updatedAt: now }
-            : ref
-        );
-
-        const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
-          ...snapshot.workspace.data,
-          workspace: {
-            ...snapshot.workspace.data.workspace,
-            updatedAt: now,
-            settings: {
-              ...previousSettings,
-              recentBookIds: updatedRecentBookIds,
-              recentSheetIds: updatedRecentSheetIds
-            }
-          },
-          books: updatedWorkspaceBooks
-        };
-
-        const nextSnapshot: WorkspaceSnapshot = {
-          workspace: { ...snapshot.workspace, data: workspaceData },
-          books: nextBooks
-        };
-
-        setSnapshot(nextSnapshot);
+        const nextSnapshot = applyCellUpdates(updates);
+        if (!nextSnapshot) {
+          return;
+        }
 
         if (isTauri && !autoSaveEnabled) {
           setBusyState('saving');
@@ -442,22 +171,30 @@ function App() {
         await showErrorDialog('セルの編集に失敗しました', toErrorMessage(error));
       }
     },
-    [snapshot, selectedBookId, selectedSheetId, autoSaveEnabled, isTauri, showErrorDialog, recordSnapshotForUndo]
+    [applyCellUpdates, autoSaveEnabled, setBusyState]
   );
 
   const handleCommitCell = useCallback(
     (rowKey: string, columnKey: string, rawValue: string) => {
-      void applyCellUpdates([{ rowKey, columnKey, value: rawValue }]);
+      void handleApplyCellUpdates([{ rowKey, columnKey, value: rawValue }]);
     },
-    [applyCellUpdates]
+    [handleApplyCellUpdates]
   );
 
   const handleCommitCells = useCallback(
-    (updates: Array<{ rowKey: string; columnKey: string; value: string }>) => {
-      void applyCellUpdates(updates);
+    (updates: CellUpdate[]) => {
+      void handleApplyCellUpdates(updates);
     },
-    [applyCellUpdates]
+    [handleApplyCellUpdates]
   );
+
+  const handleUndo = useCallback(() => {
+    undo();
+  }, [undo]);
+
+  const handleRedo = useCallback(() => {
+    redo();
+  }, [redo]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
