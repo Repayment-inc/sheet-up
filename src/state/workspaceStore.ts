@@ -144,9 +144,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
     },
 
     loadWorkspace: (snapshot) => {
-      set({ snapshot });
+      set({
+        snapshot,
+        history: [],
+        future: []
+      });
       applySelectionAfterSnapshot(snapshot);
-      resetHistory();
     },
 
     selectBook: (bookId) => {
@@ -256,7 +259,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
     },
 
     applyCellUpdates: (updates) => {
-      if (updates.length === 0) {
+      if (updates length === 0) {
         return null;
       }
 
@@ -265,7 +268,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         return null;
       }
 
-      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === selectedBookId);
+      const bookIndex = snapshot.books findIndex((entry) => entry.data.book id === selectedBookId);
       if (bookIndex === -1) {
         return null;
       }
@@ -319,7 +322,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         ...((previousSettings.recentSheetIds ?? []).filter((id) => id !== selectedSheetId))
       ].slice(0, 20);
 
-      const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
+      const updatedWorkspaceBooks = snapshot.workspace data.books.map((ref) =>
         ref.id === selectedBookId
           ? { ...ref, activeSheetId: selectedSheetId, updatedAt: now }
           : ref
@@ -384,27 +387,4 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       if (!snapshot || future.length === 0) {
         return null;
       }
-
-      const nextEntry = future[future.length - 1];
-      const nextFuture = future.slice(0, -1);
-      const nextHistory: HistoryEntry[] = [
-        ...history,
-        {
-          snapshot: cloneSnapshot(snapshot),
-          selectedBookId,
-          selectedSheetId
-        }
-      ];
-
-      set({
-        snapshot: nextEntry.snapshot,
-        selectedBookId: nextEntry.selectedBookId,
-        selectedSheetId: nextEntry.selectedSheetId,
-        history: nextHistory,
-        future: nextFuture
-      });
-
-      return nextEntry.snapshot;
-    }
-  };
-});
+...
