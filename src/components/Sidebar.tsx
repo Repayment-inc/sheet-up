@@ -6,33 +6,18 @@ interface SidebarProps {
   books: BookFile[];
   selectedBookId?: string | null;
   onSelectBook: (bookId: string) => void;
-  onSelectSheet?: (bookId: string, sheetId: string) => void;
   onCreateBook?: () => void;
-  onCreateSheet?: (bookId: string) => void;
-  onDeleteBook?: (bookId: string) => void;
-  selectedSheetId?: string | null;
 }
 
 const trimExtension = (name: string): string => name.replace(/\.json$/i, '');
 
-const Sidebar: FC<SidebarProps> = ({
-  workspace,
-  books,
-  selectedBookId,
-  selectedSheetId,
-  onSelectBook,
-  onSelectSheet,
-  onCreateBook,
-  onCreateSheet,
-  onDeleteBook
-}) => {
+const Sidebar: FC<SidebarProps> = ({ workspace, books, selectedBookId, onSelectBook, onCreateBook }) => {
   const workspaceMeta = workspace?.workspace;
   const workspaceBooks = workspace?.books ?? [];
   const createBookDisabled = !workspace || !onCreateBook;
   const createBookTitle = createBookDisabled
     ? 'ワークスペースを開いてから新規ブックを作成できます'
     : '新しいブックを追加';
-  const deleteBookDisabled = !onDeleteBook;
 
   return (
     <aside className="sidebar">
@@ -49,59 +34,16 @@ const Sidebar: FC<SidebarProps> = ({
 
             return (
               <li key={bookRef.id} className="sidebar__bookItem">
-                <div className="sidebar__bookRow">
-                  <button
-                    type="button"
-                    className={`sidebar__bookButton${isActive ? ' sidebar__bookButton--active' : ''}`}
-                    onClick={() => onSelectBook(bookRef.id)}
-                  >
-                    <span className="sidebar__bookEmoji" role="img" aria-hidden="true">
-                      📄
-                    </span>
-                    <span>{displayName}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="sidebar__bookDeleteButton"
-                    onClick={() => onDeleteBook?.(bookRef.id)}
-                    disabled={deleteBookDisabled}
-                    title="このブックを削除"
-                  >
-                    削除
-                  </button>
-                </div>
-                {isActive && book ? (
-                  <ul className="sidebar__sheetList">
-                    {book.sheets.map((sheet) => {
-                      const sheetActive = sheet.id === selectedSheetId;
-                      return (
-                        <li key={sheet.id}>
-                          <button
-                            type="button"
-                            className={`sidebar__sheetButton${sheetActive ? ' sidebar__sheetButton--active' : ''}`}
-                            onClick={() => onSelectSheet?.(bookRef.id, sheet.id)}
-                          >
-                            {sheet.name}
-                          </button>
-                        </li>
-                      );
-                    })}
-                    {book.sheets.length === 0 && (
-                      <li className="sidebar__empty">シートがありません</li>
-                    )}
-                    <li>
-                      <button
-                        type="button"
-                        className="sidebar__sheetAddButton"
-                        disabled={!onCreateSheet}
-                        onClick={() => onCreateSheet?.(bookRef.id)}
-                        title="このブックに新しいシートを追加"
-                      >
-                        + 新しいシート
-                      </button>
-                    </li>
-                  </ul>
-                ) : null}
+                <button
+                  type="button"
+                  className={`sidebar__bookButton${isActive ? ' sidebar__bookButton--active' : ''}`}
+                  onClick={() => onSelectBook(bookRef.id)}
+                >
+                  <span className="sidebar__bookEmoji" role="img" aria-hidden="true">
+                    📄
+                  </span>
+                  <span>{displayName}</span>
+                </button>
               </li>
             );
           })}

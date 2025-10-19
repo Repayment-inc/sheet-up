@@ -45,7 +45,7 @@ fn resolve_books(
     let workspace_dir = workspace_path
         .parent()
         .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf.from("."));
+        .unwrap_or_else(|| PathBuf::from("."));
 
     let books = workspace_data
         .get("books")
@@ -64,7 +64,9 @@ fn resolve_books(
         let absolute_path = workspace_dir.join(data_path);
         let book_data = read_json_file(&absolute_path)?;
         result.push(FilePayload {
-            file_path: absolute_path.to_string_lossy().into_owned(),
+            file_path: absolute_path
+                .to_string_lossy()
+                .into_owned(),
             data: book_data,
         });
     }
@@ -98,19 +100,4 @@ pub fn save_workspace_snapshot(snapshot: WorkspaceSnapshotPayload) -> Result<(),
     }
 
     Ok(())
-}
-
-#[tauri::command]
-pub fn delete_book_file(path: String) -> Result<(), String> {
-    let path = PathBuf::from(path);
-    match fs::remove_file(&path) {
-        Ok(_) => Ok(()),
-        Err(err) => {
-            if err.kind() == std::io::ErrorKind::NotFound {
-                Ok(())
-            } else {
-                Err(format!("Failed to delete {}: {}", path.display(), err))
-            }
-        }
-    }
 }
