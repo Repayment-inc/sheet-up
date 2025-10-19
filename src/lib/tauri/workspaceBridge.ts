@@ -86,6 +86,10 @@ export const saveWorkspaceSnapshot = async (
   await invoke('save_workspace_snapshot', { snapshot });
 };
 
+export const deleteBookFile = async (path: string): Promise<void> => {
+  await invoke('delete_book_file', { path });
+};
+
 export const openWorkspaceFromDialog = async (): Promise<WorkspaceSnapshot | null> => {
   const directory = await selectWorkspaceDirectory();
   if (!directory) {

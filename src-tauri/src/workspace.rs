@@ -101,3 +101,18 @@ pub fn save_workspace_snapshot(snapshot: WorkspaceSnapshotPayload) -> Result<(),
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn delete_book_file(path: String) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    match fs::remove_file(&path) {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            if err.kind() == std::io::ErrorKind::NotFound {
+                Ok(())
+            } else {
+                Err(format!("Failed to delete {}: {}", path.display(), err))
+            }
+        }
+    }
+}

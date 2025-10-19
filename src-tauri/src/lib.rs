@@ -1,6 +1,6 @@
 mod workspace;
 
-use workspace::{load_workspace_snapshot, save_workspace_snapshot};
+use workspace::{delete_book_file, load_workspace_snapshot, save_workspace_snapshot};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -16,7 +16,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             load_workspace_snapshot,
-            save_workspace_snapshot
+            save_workspace_snapshot,
+            delete_book_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
