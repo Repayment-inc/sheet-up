@@ -346,10 +346,6 @@ function App() {
         <header className="main-view__header">
           <div>
             <h2 className="main-view__title">
-              {activeSheet?.name ??
-                (snapshot ? 'シートを選択してください' : 'ワークスペースを開いてください')}
-            </h2>
-            <div className="main-view__subtitle">
               {activeBook ? (
                 isRenaming ? (
                   <input
@@ -382,6 +378,13 @@ function App() {
               ) : (
                 'データはまだ読み込まれていません'
               )}
+            </h2>
+            <div className="main-view__subtitle">
+              {activeSheet
+                ? activeSheet.name
+                : snapshot
+                  ? 'シートを選択してください'
+                  : 'ワークスペースを開いてください'}
             </div>
           </div>
           <div className="main-view__headerActions">
