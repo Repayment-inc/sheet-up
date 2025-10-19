@@ -6,7 +6,8 @@ import { isTauri } from './lib/env';
 import {
   openWorkspaceFromDialog,
   saveWorkspaceSnapshot,
-  showErrorDialog
+  showErrorDialog,
+  deleteBookFile
 } from './lib/tauri/workspaceBridge';
 import type { BookFile } from './types/schema';
 import { useWorkspaceStore, type CellUpdate } from './state/workspaceStore';
@@ -31,6 +32,7 @@ function App() {
   const createSheet = useWorkspaceStore((state) => state.createSheet);
   const applyCellUpdates = useWorkspaceStore((state) => state.applyCellUpdates);
   const renameBook = useWorkspaceStore((state) => state.renameBook);
+  const deleteBook = useWorkspaceStore((state) => state.deleteBook);
   const undo = useWorkspaceStore((state) => state.undo);
   const redo = useWorkspaceStore((state) => state.redo);
 
@@ -281,6 +283,49 @@ function App() {
     void finishRename();
   }, [finishRename]);
 
+  const handleDeleteBook = useCallback(
+    async (bookId: string) => {
+      const currentSnapshot = useWorkspaceStore.getState().snapshot;
+      const bookEntry = currentSnapshot?.books.find((entry) => entry.data.book.id === bookId);
+      if (!bookEntry) {
+        return;
+      }
+
+      const bookName = bookEntry.data.book.name ?? '名称未設定のブック';
+      const confirmed = await Promise.resolve(
+        window.confirm(`「${bookName}」を削除しますか？この操作は元に戻せません。`)
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      const nextSnapshot = deleteBook(bookId);
+      if (!nextSnapshot) {
+        return;
+      }
+
+      if (isTauri) {
+        try {
+          await deleteBookFile(bookEntry.filePath);
+        } catch (error) {
+          await showErrorDialog('ブックファイルの削除に失敗しました', toErrorMessage(error));
+        }
+      }
+
+      if (isTauri && !autoSaveEnabled) {
+        setBusyState('saving');
+        try {
+          await saveWorkspaceSnapshot(nextSnapshot);
+        } catch (error) {
+          await showErrorDialog('ブック削除後の保存に失敗しました', toErrorMessage(error));
+        } finally {
+          setBusyState('idle');
+        }
+      }
+    },
+    [autoSaveEnabled, deleteBook, setBusyState]
+  );
+
   const handleUndo = useCallback(() => {
     undo();
   }, [undo]);
@@ -341,6 +386,7 @@ function App() {
         selectedBookId={selectedBookId}
         onSelectBook={handleSelectBook}
         onCreateBook={handleCreateBook}
+        onDeleteBook={handleDeleteBook}
       />
       <section className="main-view">
         <header className="main-view__header">
