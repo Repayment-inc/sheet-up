@@ -27,7 +27,9 @@ const normalizeWorkspace = (payload: FilePayloadDto): LoadedFile<WorkspaceFile> 
   const filePath = ensureString(payload.filePath, 'workspace.filePath');
   const validation = validateWorkspaceFile(payload.data);
   if (!validation.valid) {
-    throw new Error(`workspace.json の内容が不正です。\n${validation.errors.join('\n')}`);
+    throw new Error(`workspace.json の内容が不正です。
+${validation.errors.join('
+')}`);
   }
   return {
     filePath,
@@ -39,7 +41,9 @@ const normalizeBook = (payload: FilePayloadDto): LoadedFile<BookFile> => {
   const filePath = ensureString(payload.filePath, 'book.filePath');
   const validation = validateBookFile(payload.data);
   if (!validation.valid) {
-    throw new Error(`ブックファイルの内容が不正です。\n${validation.errors.join('\n')}`);
+    throw new Error(`ブックファイルの内容が不正です。
+${validation.errors.join('
+')}`);
   }
   return {
     filePath,
@@ -86,6 +90,10 @@ export const saveWorkspaceSnapshot = async (
   await invoke('save_workspace_snapshot', { snapshot });
 };
 
+export const deleteBookFile = async (path: string): Promise<void> => {
+  await invoke('delete_book_file', { path });
+};
+
 export const openWorkspaceFromDialog = async (): Promise<WorkspaceSnapshot | null> => {
   const directory = await selectWorkspaceDirectory();
   if (!directory) {
@@ -103,6 +111,7 @@ export const showErrorDialog = async (title: string, description: string): Promi
     });
   } else {
     // eslint-disable-next-line no-alert -- 非Tauri環境でのフォールバック
-    window.alert(`${title}\n${description}`);
+    window.alert(`${title}
+${description}`);
   }
 };
