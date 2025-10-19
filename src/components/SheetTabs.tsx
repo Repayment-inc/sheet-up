@@ -1,4 +1,4 @@
-import { type FC } from 'react';
+import { type FC, type MutableRefObject } from 'react';
 import type { BookFile } from '../types/schema';
 
 interface SheetTabsProps {
@@ -6,9 +6,30 @@ interface SheetTabsProps {
   selectedSheetId?: string | null;
   onSelectSheet: (sheetId: string) => void;
   onCreateSheet?: () => void;
+  renamingSheetId?: string | null;
+  draftSheetName?: string;
+  onStartRename?: (sheetId: string) => void;
+  onRenameChange?: (value: string) => void;
+  onRenameCommit?: () => void | Promise<void>;
+  onRenameCancel?: () => void;
+  onRenameBlur?: () => void;
+  renameInputRef?: MutableRefObject<HTMLInputElement | null>;
 }
 
-const SheetTabs: FC<SheetTabsProps> = ({ book, selectedSheetId, onSelectSheet, onCreateSheet }) => {
+const SheetTabs: FC<SheetTabsProps> = ({
+  book,
+  selectedSheetId,
+  onSelectSheet,
+  onCreateSheet,
+  renamingSheetId,
+  draftSheetName,
+  onStartRename,
+  onRenameChange,
+  onRenameCommit,
+  onRenameCancel,
+  onRenameBlur,
+  renameInputRef
+}) => {
   if (!book) {
     return (
       <div className="sheet-tabs sheet-tabs--empty">
@@ -34,17 +55,62 @@ const SheetTabs: FC<SheetTabsProps> = ({ book, selectedSheetId, onSelectSheet, o
         <div className="sheet-tabs__list" role="tablist" aria-label="シート">
           {book.sheets.map((sheet) => {
             const isActive = sheet.id === selectedSheetId;
+            const isRenaming = sheet.id === renamingSheetId;
+            const className = [
+              'sheet-tabs__tab',
+              isActive ? 'sheet-tabs__tab--active' : '',
+              isRenaming ? 'sheet-tabs__tab--renaming' : ''
+            ]
+              .filter(Boolean)
+              .join(' ');
+
             return (
-              <button
+              <div
                 key={sheet.id}
-                type="button"
                 role="tab"
                 aria-selected={isActive}
-                className={`sheet-tabs__tab${isActive ? ' sheet-tabs__tab--active' : ''}`}
-                onClick={() => handleSelect(sheet.id)}
+                className={className}
+                tabIndex={isRenaming ? -1 : 0}
+                onClick={() => {
+                  if (isRenaming) return;
+                  handleSelect(sheet.id);
+                }}
+                onKeyDown={(event) => {
+                  if (isRenaming) return;
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleSelect(sheet.id);
+                  } else if (event.key === 'F2') {
+                    event.preventDefault();
+                    onStartRename?.(sheet.id);
+                  }
+                }}
+                onDoubleClick={() => {
+                  if (isRenaming) return;
+                  onStartRename?.(sheet.id);
+                }}
               >
-                {sheet.name}
-              </button>
+                {isRenaming ? (
+                  <input
+                    ref={renameInputRef ?? undefined}
+                    className="sheet-tabs__renameInput"
+                    value={draftSheetName ?? ''}
+                    onChange={(event) => onRenameChange?.(event.currentTarget.value)}
+                    onBlur={() => onRenameBlur?.()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        onRenameCommit?.();
+                      } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        onRenameCancel?.();
+                      }
+                    }}
+                  />
+                ) : (
+                  <span className="sheet-tabs__tabLabel">{sheet.name}</span>
+                )}
+              </div>
             );
           })}
           {book.sheets.length === 0 && (

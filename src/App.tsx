@@ -32,6 +32,7 @@ function App() {
   const createSheet = useWorkspaceStore((state) => state.createSheet);
   const applyCellUpdates = useWorkspaceStore((state) => state.applyCellUpdates);
   const renameBook = useWorkspaceStore((state) => state.renameBook);
+  const renameSheet = useWorkspaceStore((state) => state.renameSheet);
   const deleteBook = useWorkspaceStore((state) => state.deleteBook);
   const undo = useWorkspaceStore((state) => state.undo);
   const redo = useWorkspaceStore((state) => state.redo);
@@ -194,8 +195,12 @@ function App() {
 
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftBookName, setDraftBookName] = useState('');
-  const renameInputRef = useRef<HTMLInputElement>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
   const skipBlurCommitRef = useRef(false);
+  const [renamingSheetId, setRenamingSheetId] = useState<string | null>(null);
+  const [draftSheetName, setDraftSheetName] = useState('');
+  const sheetRenameInputRef = useRef<HTMLInputElement | null>(null);
+  const skipSheetBlurCommitRef = useRef(false);
 
   useEffect(() => {
     if (activeBook) {
@@ -212,6 +217,29 @@ function App() {
       renameInputRef.current?.select();
     }
   }, [isRenaming]);
+
+  useEffect(() => {
+    if (!activeBook) {
+      setRenamingSheetId(null);
+      setDraftSheetName('');
+      return;
+    }
+    if (renamingSheetId) {
+      const targetSheet = activeBook.sheets.find((sheet) => sheet.id === renamingSheetId);
+      if (!targetSheet) {
+        setRenamingSheetId(null);
+        setDraftSheetName('');
+      }
+    }
+  }, [activeBook, renamingSheetId]);
+
+  useEffect(() => {
+    if (!renamingSheetId) {
+      return;
+    }
+    sheetRenameInputRef.current?.focus();
+    sheetRenameInputRef.current?.select();
+  }, [renamingSheetId]);
 
   const handleStartRenaming = useCallback(() => {
     if (!activeBook) return;
@@ -282,6 +310,97 @@ function App() {
     }
     void finishRename();
   }, [finishRename]);
+
+  const handleStartSheetRename = useCallback(
+    (sheetId: string) => {
+      if (!activeBook) return;
+      const sheet = activeBook.sheets.find((entry) => entry.id === sheetId);
+      if (!sheet) return;
+      setDraftSheetName(sheet.name ?? '');
+      setRenamingSheetId(sheetId);
+      skipSheetBlurCommitRef.current = false;
+    },
+    [activeBook]
+  );
+
+  const handleSheetRenameChange = useCallback((value: string) => {
+    setDraftSheetName(value);
+  }, []);
+
+  const finishSheetRename = useCallback(async () => {
+    if (!activeBook || !renamingSheetId) {
+      setRenamingSheetId(null);
+      return;
+    }
+
+    const sheet = activeBook.sheets.find((entry) => entry.id === renamingSheetId);
+    if (!sheet) {
+      setRenamingSheetId(null);
+      return;
+    }
+
+    const currentName = sheet.name ?? '';
+    const trimmed = draftSheetName.trim();
+
+    if (!trimmed || trimmed === currentName) {
+      setDraftSheetName(currentName);
+      setRenamingSheetId(null);
+      return;
+    }
+
+    try {
+      const nextSnapshot = renameSheet(activeBook.book.id, renamingSheetId, trimmed);
+      if (!nextSnapshot) {
+        setDraftSheetName(currentName);
+        setRenamingSheetId(null);
+        return;
+      }
+
+      if (isTauri && !autoSaveEnabled) {
+        setBusyState('saving');
+        try {
+          await saveWorkspaceSnapshot(nextSnapshot);
+        } catch (error) {
+          await showErrorDialog('シート名の保存に失敗しました', toErrorMessage(error));
+          setDraftSheetName(currentName);
+        } finally {
+          setBusyState('idle');
+        }
+      }
+    } catch (error) {
+      await showErrorDialog('シート名の変更に失敗しました', toErrorMessage(error));
+      setDraftSheetName(currentName);
+    } finally {
+      setRenamingSheetId(null);
+      skipSheetBlurCommitRef.current = false;
+    }
+  }, [
+    activeBook,
+    renamingSheetId,
+    draftSheetName,
+    renameSheet,
+    autoSaveEnabled,
+    setBusyState
+  ]);
+
+  const cancelSheetRename = useCallback(() => {
+    if (activeBook && renamingSheetId) {
+      const sheet = activeBook.sheets.find((entry) => entry.id === renamingSheetId);
+      if (sheet) {
+        setDraftSheetName(sheet.name ?? '');
+      }
+    }
+    skipSheetBlurCommitRef.current = true;
+    setRenamingSheetId(null);
+  }, [activeBook, renamingSheetId]);
+
+  const handleSheetRenameBlur = useCallback(() => {
+    if (skipSheetBlurCommitRef.current) {
+      skipSheetBlurCommitRef.current = false;
+      return;
+    }
+    void finishSheetRename();
+  }, [finishSheetRename]);
 
   const handleDeleteBook = useCallback(
     async (bookId: string) => {
@@ -494,6 +613,14 @@ function App() {
                       }
                     : undefined
                 }
+                renamingSheetId={renamingSheetId}
+                draftSheetName={draftSheetName}
+                onStartRename={handleStartSheetRename}
+                onRenameChange={handleSheetRenameChange}
+                onRenameCommit={finishSheetRename}
+                onRenameCancel={cancelSheetRename}
+                onRenameBlur={handleSheetRenameBlur}
+                renameInputRef={sheetRenameInputRef}
               />
             </div>
           ) : (

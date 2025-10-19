@@ -82,6 +82,7 @@ type WorkspaceStoreActions = {
   createSheet: (bookId: string) => { snapshot: WorkspaceSnapshot; sheetId: string };
   applyCellUpdates: (updates: CellUpdate[]) => WorkspaceSnapshot | null;
   renameBook: (bookId: string, nextName: string) => WorkspaceSnapshot | null;
+  renameSheet: (bookId: string, sheetId: string, nextName: string) => WorkspaceSnapshot | null;
   deleteBook: (bookId: string) => WorkspaceSnapshot | null;
   undo: () => WorkspaceSnapshot | null;
   redo: () => WorkspaceSnapshot | null;
@@ -409,6 +410,79 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
             name: trimmed,
             updatedAt: now
           }
+        }
+      };
+
+      const updatedBooks = snapshot.books.map((entry, index) =>
+        index === bookIndex ? updatedBookEntry : entry
+      );
+
+      const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
+        ref.id === bookId ? { ...ref, updatedAt: now } : ref
+      );
+
+      const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
+        ...snapshot.workspace.data,
+        workspace: {
+          ...snapshot.workspace.data.workspace,
+          updatedAt: now
+        },
+        books: updatedWorkspaceBooks
+      };
+
+      const nextSnapshot: WorkspaceSnapshot = {
+        workspace: { ...snapshot.workspace, data: workspaceData },
+        books: updatedBooks
+      };
+
+      set({ snapshot: nextSnapshot });
+
+      return nextSnapshot;
+    },
+
+    renameSheet: (bookId, sheetId, nextName) => {
+      const trimmed = nextName.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      const { snapshot } = get();
+      if (!snapshot) {
+        return null;
+      }
+
+      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === bookId);
+      if (bookIndex === -1) {
+        return null;
+      }
+
+      const bookEntry = snapshot.books[bookIndex];
+      const sheetIndex = bookEntry.data.sheets.findIndex((sheet) => sheet.id === sheetId);
+      if (sheetIndex === -1) {
+        return null;
+      }
+
+      const targetSheet = bookEntry.data.sheets[sheetIndex];
+      if ((targetSheet.name ?? '') === trimmed) {
+        return null;
+      }
+
+      recordSnapshotForUndo();
+
+      const now = new Date().toISOString();
+      const nextSheets = bookEntry.data.sheets.map((sheet, index) =>
+        index === sheetIndex ? { ...sheet, name: trimmed } : sheet
+      );
+
+      const updatedBookEntry = {
+        ...bookEntry,
+        data: {
+          ...bookEntry.data,
+          book: {
+            ...bookEntry.data.book,
+            updatedAt: now
+          },
+          sheets: nextSheets
         }
       };
 
