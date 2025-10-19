@@ -82,6 +82,7 @@ type WorkspaceStoreActions = {
   createSheet: (bookId: string) => { snapshot: WorkspaceSnapshot; sheetId: string };
   applyCellUpdates: (updates: CellUpdate[]) => WorkspaceSnapshot | null;
   renameBook: (bookId: string, nextName: string) => WorkspaceSnapshot | null;
+  deleteBook: (bookId: string) => WorkspaceSnapshot | null;
   undo: () => WorkspaceSnapshot | null;
   redo: () => WorkspaceSnapshot | null;
 };
@@ -434,6 +435,59 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       };
 
       set({ snapshot: nextSnapshot });
+
+      return nextSnapshot;
+    },
+
+    deleteBook: (bookId) => {
+      const { snapshot } = get();
+      if (!snapshot) {
+        return null;
+      }
+
+      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === bookId);
+      if (bookIndex === -1) {
+        return null;
+      }
+
+      recordSnapshotForUndo();
+
+      const removedBook = snapshot.books[bookIndex];
+      const sheetIds = removedBook.data.sheets.map((sheet) => sheet.id);
+      const nextBooks = snapshot.books.filter((_, index) => index !== bookIndex);
+      const now = new Date().toISOString();
+
+      const previousWorkspace = snapshot.workspace.data;
+      const previousSettings = previousWorkspace.workspace.settings ?? {};
+
+      const updatedRecentBookIds = (previousSettings.recentBookIds ?? []).filter(
+        (id) => id !== bookId
+      );
+      const updatedRecentSheetIds = (previousSettings.recentSheetIds ?? []).filter(
+        (id) => !sheetIds.includes(id)
+      );
+
+      const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
+        ...previousWorkspace,
+        workspace: {
+          ...previousWorkspace.workspace,
+          updatedAt: now,
+          settings: {
+            ...previousSettings,
+            recentBookIds: updatedRecentBookIds,
+            recentSheetIds: updatedRecentSheetIds
+          }
+        },
+        books: previousWorkspace.books.filter((ref) => ref.id !== bookId)
+      };
+
+      const nextSnapshot: WorkspaceSnapshot = {
+        workspace: { ...snapshot.workspace, data: workspaceData },
+        books: nextBooks
+      };
+
+      set({ snapshot: nextSnapshot });
+      applySelectionAfterSnapshot(nextSnapshot);
 
       return nextSnapshot;
     },

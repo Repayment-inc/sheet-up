@@ -122,7 +122,7 @@ button {
   font-size: 0.9rem;
 }
 
-sidebar__sheetList {
+.sidebar__sheetList {
   margin-top: 4px;
   padding-left: 22px;
   display: flex;
@@ -130,7 +130,7 @@ sidebar__sheetList {
   gap: 2px;
 }
 
-sidebar__sheetAddButton {
+.sidebar__sheetAddButton {
   width: 100%;
   padding: 4px 6px;
   border: none;
@@ -142,203 +142,15 @@ sidebar__sheetAddButton {
   cursor: pointer;
 }
 
-sidebar__sheetAddButton:hover {
+.sidebar__sheetAddButton:hover {
   background: rgba(255, 255, 255, 0.18);
   color: #f9fafb;
 }
 
-sidebar__sheetAddButton:disabled {
+.sidebar__sheetAddButton:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-sidebar__sheetButton {
-  width: 100%;
-  padding: 4px 6px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(249, 250, 251, 0.8);
-  font-size: 0.85rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-sidebar__sheetButton:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f9fafb;
-}
-
-sidebar__sheetButton--active {
-  background: rgba(255, 255, 255, 0.18);
-  color: #f9fafb;
-}
-
-sidebar__empty {
-  margin: 12px 0;
-  font-size: 0.8rem;
-  color: rgba(249, 250, 251, 0.5);
-}
-
-sidebar__footer {
-  padding: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-sidebar__actionButton {
-  width: 100%;
-  padding: 10px 0;
-  border-radius: 8px;
-  border: 1px dashed rgba(249, 250, 251, 0.3);
-  background: transparent;
-  color: rgba(249, 250, 251, 0.7);
-}
-
-sidebar__actionButton:not(:disabled) {
-  cursor: pointer;
-  border-style: solid;
-  border-color: rgba(249, 250, 251, 0.5);
-}
-
-sidebar__actionButton:not(:disabled):hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #f9fafb;
-}
-
-sidebar__actionButton:disabled {
-  cursor: not-allowed;
-}
-
-.main-view {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  background: #f8fafc;
-  color: #111827;
-}
-
-.main-view__header {
-  padding: 20px 28px;
-  border-bottom: 1px solid #e5e7eb;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.main-view__title {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.main-view__subtitle {
-  margin: 6px 0 0;
-  font-size: 0.9rem;
-  color: #6b7280;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-main-view__bookNameButton {
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  padding: 4px 8px;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-main-view__bookNameButton:hover,
-main-view__bookNameButton:focus {
-  border-color: #94a3b8;
-  background: rgba(148, 163, 184, 0.15);
-  outline: none;
-}
-
-main-view__bookNameInput {
-  font: inherit;
-  color: #111827;
-  border: 1px solid #94a3b8;
-  border-radius: 6px;
-  padding: 6px 10px;
-  min-width: 200px;
-  max-width: min(100%, 360px);
-  box-sizing: border-box;
-  background: #ffffff;
-}
-
-main-view__bookNameInput:focus {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-}
-
-main-view__meta {
-  display: flex;
-  gap: 16px;
-  font-size: 0.85rem;
-  color: #6b7280;
-}
-
-main-view__meta strong {
-  color: #111827;
-}
-
-main-view__headerActions {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-}
-
-main-view__toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-main-view__actionButton {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #111827;
-  cursor: pointer;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-main-view__actionButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-main-view__actionButton:not(:disabled):hover {
-  background: #f3f4f6;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-}
-
-main-view__toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  color: #4b5563;
-  user-select: none;
-}
-
-main-view__toggle input {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-}
-
-main-view__status {
-  min-height: 24px;
-  font-size: 0.85rem;
-  color: #6b7280;
-  display: flex;
-  alignメント...
+.sidebar__sheetButton {
+  width: ################################################################################
