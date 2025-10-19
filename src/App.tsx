@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SheetGrid from './components/SheetGrid';
 import Sidebar from './components/Sidebar';
 import SheetTabs from './components/SheetTabs';
@@ -30,6 +30,7 @@ function App() {
   const createBook = useWorkspaceStore((state) => state.createBook);
   const createSheet = useWorkspaceStore((state) => state.createSheet);
   const applyCellUpdates = useWorkspaceStore((state) => state.applyCellUpdates);
+  const renameBook = useWorkspaceStore((state) => state.renameBook);
   const undo = useWorkspaceStore((state) => state.undo);
   const redo = useWorkspaceStore((state) => state.redo);
 
@@ -189,6 +190,97 @@ function App() {
     [handleApplyCellUpdates]
   );
 
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [draftBookName, setDraftBookName] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const skipBlurCommitRef = useRef(false);
+
+  useEffect(() => {
+    if (activeBook) {
+      setDraftBookName(activeBook.book.name ?? '');
+    } else {
+      setDraftBookName('');
+    }
+    setIsRenaming(false);
+  }, [activeBook]);
+
+  useEffect(() => {
+    if (isRenaming) {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }
+  }, [isRenaming]);
+
+  const handleStartRenaming = useCallback(() => {
+    if (!activeBook) return;
+    setDraftBookName(activeBook.book.name ?? '');
+    setIsRenaming(true);
+    skipBlurCommitRef.current = false;
+  }, [activeBook]);
+
+  const handleRenameChange = useCallback((value: string) => {
+    setDraftBookName(value);
+  }, []);
+
+  const finishRename = useCallback(async () => {
+    if (!activeBook) {
+      setIsRenaming(false);
+      return;
+    }
+
+    const trimmed = draftBookName.trim();
+    const currentName = activeBook.book.name ?? '';
+
+    if (!trimmed || trimmed === currentName) {
+      setDraftBookName(currentName);
+      setIsRenaming(false);
+      return;
+    }
+
+    try {
+      const nextSnapshot = renameBook(activeBook.book.id, trimmed);
+      if (!nextSnapshot) {
+        setDraftBookName(currentName);
+        setIsRenaming(false);
+        return;
+      }
+
+      if (isTauri && !autoSaveEnabled) {
+        setBusyState('saving');
+        try {
+          await saveWorkspaceSnapshot(nextSnapshot);
+        } catch (error) {
+          await showErrorDialog('ブック名の保存に失敗しました', toErrorMessage(error));
+          setDraftBookName(currentName);
+        } finally {
+          setBusyState('idle');
+        }
+      }
+    } catch (error) {
+      await showErrorDialog('ブック名の変更に失敗しました', toErrorMessage(error));
+      setDraftBookName(currentName);
+    } finally {
+      setIsRenaming(false);
+      skipBlurCommitRef.current = false;
+    }
+  }, [activeBook, draftBookName, renameBook, autoSaveEnabled, setBusyState]);
+
+  const cancelRename = useCallback(() => {
+    if (activeBook) {
+      setDraftBookName(activeBook.book.name ?? '');
+    }
+    skipBlurCommitRef.current = true;
+    setIsRenaming(false);
+  }, [activeBook]);
+
+  const handleRenameBlur = useCallback(() => {
+    if (skipBlurCommitRef.current) {
+      skipBlurCommitRef.current = false;
+      return;
+    }
+    void finishRename();
+  }, [finishRename]);
+
   const handleUndo = useCallback(() => {
     undo();
   }, [undo]);
@@ -257,43 +349,72 @@ function App() {
               {activeSheet?.name ??
                 (snapshot ? 'シートを選択してください' : 'ワークスペースを開いてください')}
             </h2>
-            <p className="main-view__subtitle">
-              {activeBook
-                ? activeBook.book.name
-                : snapshot
-                  ? 'ブックを選択してください'
-                  : 'データはまだ読み込まれていません'}
-            </p>
+            <div className="main-view__subtitle">
+              {activeBook ? (
+                isRenaming ? (
+                  <input
+                    ref={renameInputRef}
+                    className="main-view__bookNameInput"
+                    value={draftBookName}
+                    onChange={(event) => handleRenameChange(event.currentTarget.value)}
+                    onBlur={handleRenameBlur}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        void finishRename();
+                      } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        cancelRename();
+                      }
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="main-view__bookNameButton"
+                    onClick={handleStartRenaming}
+                  >
+                    {activeBook.book.name ?? '名称未設定のブック'}
+                  </button>
+                )
+              ) : snapshot ? (
+                'ブックを選択してください'
+              ) : (
+                'データはまだ読み込まれていません'
+              )}
+            </div>
           </div>
           <div className="main-view__headerActions">
-            {isTauri ? (
-              <div className="main-view__toolbar">
-                <button
-                  type="button"
-                  className="main-view__actionButton"
-                  onClick={handleOpenWorkspace}
-                  disabled={busyState === 'loading'}
-                >
-                  {snapshot ? '別のワークスペースを開く' : 'ワークスペースを開く'}
-                </button>
-                <button
-                  type="button"
-                  className="main-view__actionButton"
-                  onClick={handleSaveWorkspace}
-                  disabled={!snapshot || busyState === 'saving'}
-                >
-                  {busyState === 'saving' ? '保存中…' : '保存'}
-                </button>
-                <label className="main-view__toggle">
-                  <input
-                    type="checkbox"
-                    checked={autoSaveEnabled}
-                    onChange={(event) => setAutoSaveEnabled(event.currentTarget.checked)}
-                  />
+            <div className="main-view__toolbar">
+              {isTauri ? (
+                <>
+                  <button
+                    type="button"
+                    className="main-view__actionButton"
+                    onClick={handleOpenWorkspace}
+                    disabled={busyState === 'loading'}
+                  >
+                    {snapshot ? '別のワークスペースを開く' : 'ワークスペースを開く'}
+                  </button>
+                  <button
+                    type="button"
+                    className="main-view__actionButton"
+                    onClick={handleSaveWorkspace}
+                    disabled={!snapshot || busyState === 'saving'}
+                  >
+                    {busyState === 'saving' ? '保存中…' : '保存'}
+                  </button>
+                  <label className="main-view__toggle">
+                    <input
+                      type="checkbox"
+                      checked={autoSaveEnabled}
+                      onChange={(event) => setAutoSaveEnabled(event.currentTarget.checked)}
+                    />
                   <span>{autosaveDescription}</span>
                 </label>
-              </div>
-            ) : null}
+              </>
+              ) : null}
+            </div>
             <div className="main-view__status">
               {busyState === 'loading' ? '読み込み中…' : null}
               {busyState === 'saving' ? '保存中…' : null}

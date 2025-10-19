@@ -210,6 +210,45 @@ button {
   margin: 6px 0 0;
   font-size: 0.9rem;
   color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.main-view__bookNameButton {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.main-view__bookNameButton:hover,
+.main-view__bookNameButton:focus {
+  border-color: #94a3b8;
+  background: rgba(148, 163, 184, 0.15);
+  outline: none;
+}
+
+.main-view__bookNameInput {
+  font: inherit;
+  color: #111827;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  padding: 6px 10px;
+  min-width: 200px;
+  max-width: min(100%, 360px);
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.main-view__bookNameInput:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .main-view__meta {

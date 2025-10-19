@@ -81,6 +81,7 @@ type WorkspaceStoreActions = {
   createBook: () => WorkspaceSnapshot;
   createSheet: (bookId: string) => { snapshot: WorkspaceSnapshot; sheetId: string };
   applyCellUpdates: (updates: CellUpdate[]) => WorkspaceSnapshot | null;
+  renameBook: (bookId: string, nextName: string) => WorkspaceSnapshot | null;
   undo: () => WorkspaceSnapshot | null;
   redo: () => WorkspaceSnapshot | null;
 };
@@ -367,6 +368,69 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         books: snapshot.books.map((entry, index) =>
           index === bookIndex ? { ...entry, data: { ...bookEntry.data, sheets: nextSheets } } : entry
         )
+      };
+
+      set({ snapshot: nextSnapshot });
+
+      return nextSnapshot;
+    },
+
+    renameBook: (bookId, nextName) => {
+      const trimmed = nextName.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      const { snapshot } = get();
+      if (!snapshot) {
+        return null;
+      }
+
+      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === bookId);
+      if (bookIndex === -1) {
+        return null;
+      }
+
+      const bookEntry = snapshot.books[bookIndex];
+      if ((bookEntry.data.book.name ?? '') === trimmed) {
+        return null;
+      }
+
+      recordSnapshotForUndo();
+
+      const now = new Date().toISOString();
+      const updatedBookEntry = {
+        ...bookEntry,
+        data: {
+          ...bookEntry.data,
+          book: {
+            ...bookEntry.data.book,
+            name: trimmed,
+            updatedAt: now
+          }
+        }
+      };
+
+      const updatedBooks = snapshot.books.map((entry, index) =>
+        index === bookIndex ? updatedBookEntry : entry
+      );
+
+      const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) =>
+        ref.id === bookId ? { ...ref, updatedAt: now } : ref
+      );
+
+      const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
+        ...snapshot.workspace.data,
+        workspace: {
+          ...snapshot.workspace.data.workspace,
+          updatedAt: now
+        },
+        books: updatedWorkspaceBooks
+      };
+
+      const nextSnapshot: WorkspaceSnapshot = {
+        workspace: { ...snapshot.workspace, data: workspaceData },
+        books: updatedBooks
       };
 
       set({ snapshot: nextSnapshot });
