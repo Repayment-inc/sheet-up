@@ -420,19 +420,47 @@ button {
   color: #374151;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-.sheet-tabs__tab:hover {
-  background: #d1d5db;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  outline: none;
 }
 
 .sheet-tabs__tab--active {
   background: #2563eb;
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.sheet-tabs__tab:focus-visible {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
+}
+
+.sheet-tabs__tab--renaming {
+  cursor: text;
+}
+
+.sheet-tabs__tabLabel {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-tabs__renameInput {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85rem;
+  outline: none;
+  width: 160px;
+}
+
+.sheet-tabs__renameInput::placeholder {
+  color: rgba(55, 65, 81, 0.6);
 }
 
 .sheet-tabs__placeholder {
