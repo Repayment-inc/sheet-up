@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import Sidebar from './components/Sidebar';
 import SheetGrid from './components/SheetGrid';
+import Sidebar from './components/Sidebar';
+import SheetTabs from './components/SheetTabs';
 import { isTauri } from './lib/env';
 import {
   openWorkspaceFromDialog,
@@ -246,11 +247,8 @@ function App() {
         workspace={workspaceFile}
         books={bookFiles}
         selectedBookId={selectedBookId}
-        selectedSheetId={selectedSheetId}
         onSelectBook={handleSelectBook}
-        onSelectSheet={handleSelectSheet}
         onCreateBook={handleCreateBook}
-        onCreateSheet={handleCreateSheet}
       />
       <section className="main-view">
         <header className="main-view__header">
@@ -304,11 +302,30 @@ function App() {
         </header>
         <div className="main-view__content">
           {snapshot ? (
-            <SheetGrid
-              sheet={activeSheet ?? null}
-              onCommitCell={handleCommitCell}
-              onCommitCells={handleCommitCells}
-            />
+            <div className="main-view__workspace">
+              <div className="main-view__gridContainer">
+                <SheetGrid
+                  sheet={activeSheet ?? null}
+                  onCommitCell={handleCommitCell}
+                  onCommitCells={handleCommitCells}
+                />
+              </div>
+              <SheetTabs
+                book={activeBook}
+                selectedSheetId={selectedSheetId}
+                onSelectSheet={(sheetId) => {
+                  if (!activeBook) return;
+                  handleSelectSheet(activeBook.book.id, sheetId);
+                }}
+                onCreateSheet={
+                  activeBook
+                    ? () => {
+                        void handleCreateSheet(activeBook.book.id);
+                      }
+                    : undefined
+                }
+              />
+            </div>
           ) : (
             renderEmptyState()
           )}
