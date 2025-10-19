@@ -1,37 +1,23 @@
-import { useMemo, type FC } from 'react';
+import { type FC } from 'react';
 import type { WorkspaceFile, BookFile } from '../types/schema';
 
 interface SidebarProps {
   workspace: WorkspaceFile | null;
   books: BookFile[];
   selectedBookId?: string | null;
-  selectedSheetId?: string | null;
   onSelectBook: (bookId: string) => void;
-  onSelectSheet: (bookId: string, sheetId: string) => void;
   onCreateBook?: () => void;
-  onCreateSheet?: (bookId: string) => void;
 }
 
 const trimExtension = (name: string): string => name.replace(/\.json$/i, '');
 
-const Sidebar: FC<SidebarProps> = ({
-  workspace,
-  books,
-  selectedBookId,
-  selectedSheetId,
-  onSelectBook,
-  onSelectSheet,
-  onCreateBook,
-  onCreateSheet
-}) => {
-  const booksById = useMemo(() => new Map(books.map((book) => [book.book.id, book])), [books]);
+const Sidebar: FC<SidebarProps> = ({ workspace, books, selectedBookId, onSelectBook, onCreateBook }) => {
   const workspaceMeta = workspace?.workspace;
   const workspaceBooks = workspace?.books ?? [];
   const createBookDisabled = !workspace || !onCreateBook;
   const createBookTitle = createBookDisabled
     ? 'ワークスペースを開いてから新規ブックを作成できます'
     : '新しいブックを追加';
-  const createSheetDisabled = !onCreateSheet;
 
   return (
     <aside className="sidebar">
@@ -42,7 +28,7 @@ const Sidebar: FC<SidebarProps> = ({
       <nav className="sidebar__body">
         <ul className="sidebar__bookList">
           {workspaceBooks.map((bookRef) => {
-            const book = booksById.get(bookRef.id);
+            const book = books.find((entry) => entry.book.id === bookRef.id);
             const isActive = bookRef.id === selectedBookId;
             const displayName = book?.book.name ?? trimExtension(bookRef.name);
 
@@ -58,38 +44,6 @@ const Sidebar: FC<SidebarProps> = ({
                   </span>
                   <span>{displayName}</span>
                 </button>
-                {isActive && book ? (
-                  <ul className="sidebar__sheetList">
-                    {book.sheets.map((sheet) => {
-                      const sheetActive = sheet.id === selectedSheetId;
-                      return (
-                        <li key={sheet.id}>
-                          <button
-                            type="button"
-                            className={`sidebar__sheetButton${sheetActive ? ' sidebar__sheetButton--active' : ''}`}
-                            onClick={() => onSelectSheet(bookRef.id, sheet.id)}
-                          >
-                            {sheet.name}
-                          </button>
-                        </li>
-                      );
-                    })}
-                    {book.sheets.length === 0 && (
-                      <li className="sidebar__empty">シートがありません</li>
-                    )}
-                    <li>
-                      <button
-                        type="button"
-                        className="sidebar__sheetAddButton"
-                        disabled={createSheetDisabled}
-                        onClick={() => onCreateSheet?.(bookRef.id)}
-                        title="このブックに新しいシートを追加"
-                      >
-                        + 新しいシート
-                      </button>
-                    </li>
-                  </ul>
-                ) : null}
               </li>
             );
           })}
