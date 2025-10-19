@@ -83,6 +83,7 @@ type WorkspaceStoreActions = {
   applyCellUpdates: (updates: CellUpdate[]) => WorkspaceSnapshot | null;
   renameBook: (bookId: string, nextName: string) => WorkspaceSnapshot | null;
   renameSheet: (bookId: string, sheetId: string, nextName: string) => WorkspaceSnapshot | null;
+  deleteSheet: (bookId: string, sheetId: string) => WorkspaceSnapshot | null;
   deleteBook: (bookId: string) => WorkspaceSnapshot | null;
   undo: () => WorkspaceSnapshot | null;
   redo: () => WorkspaceSnapshot | null;
@@ -509,6 +510,97 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       };
 
       set({ snapshot: nextSnapshot });
+
+      return nextSnapshot;
+    },
+
+    deleteSheet: (bookId, sheetId) => {
+      const { snapshot, selectedBookId, selectedSheetId } = get();
+      if (!snapshot) {
+        return null;
+      }
+
+      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === bookId);
+      if (bookIndex === -1) {
+        return null;
+      }
+
+      const bookEntry = snapshot.books[bookIndex];
+      const sheetIndex = bookEntry.data.sheets.findIndex((sheet) => sheet.id === sheetId);
+      if (sheetIndex === -1) {
+        return null;
+      }
+
+      recordSnapshotForUndo();
+
+      const nextSheets = bookEntry.data.sheets.filter((sheet) => sheet.id !== sheetId);
+      const now = new Date().toISOString();
+      let fallbackSheetId: string | null = null;
+      if (nextSheets.length > 0) {
+        const fallbackIndex = Math.min(sheetIndex, nextSheets.length - 1);
+        fallbackSheetId = nextSheets[fallbackIndex]?.id ?? null;
+      }
+
+      const nextSelectedSheetId =
+        selectedBookId === bookId && selectedSheetId === sheetId ? fallbackSheetId : selectedSheetId;
+
+      const updatedBookEntry = {
+        ...bookEntry,
+        data: {
+          ...bookEntry.data,
+          book: {
+            ...bookEntry.data.book,
+            updatedAt: now
+          },
+          sheets: nextSheets
+        }
+      };
+
+      const updatedBooks = snapshot.books.map((entry, index) =>
+        index === bookIndex ? updatedBookEntry : entry
+      );
+
+      const previousSettings = snapshot.workspace.data.workspace.settings ?? {};
+      const updatedRecentSheetIds = (previousSettings.recentSheetIds ?? []).filter(
+        (id) => id !== sheetId
+      );
+
+      const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) => {
+        if (ref.id !== bookId) {
+          return ref.activeSheetId === sheetId ? { ...ref, activeSheetId: undefined } : ref;
+        }
+        const nextActiveSheetId =
+          ref.activeSheetId === sheetId ? fallbackSheetId ?? undefined : ref.activeSheetId;
+        return {
+          ...ref,
+          updatedAt: now,
+          activeSheetId: nextActiveSheetId
+        };
+      });
+
+      const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
+        ...snapshot.workspace.data,
+        workspace: {
+          ...snapshot.workspace.data.workspace,
+          updatedAt: now,
+          settings: {
+            ...previousSettings,
+            recentSheetIds: updatedRecentSheetIds
+          }
+        },
+        books: updatedWorkspaceBooks
+      };
+
+      const nextSnapshot: WorkspaceSnapshot = {
+        workspace: { ...snapshot.workspace, data: workspaceData },
+        books: updatedBooks
+      };
+
+      set({
+        snapshot: nextSnapshot,
+        selectedBookId,
+        selectedSheetId: nextSelectedSheetId ?? null
+      });
 
       return nextSnapshot;
     },

@@ -33,6 +33,7 @@ function App() {
   const applyCellUpdates = useWorkspaceStore((state) => state.applyCellUpdates);
   const renameBook = useWorkspaceStore((state) => state.renameBook);
   const renameSheet = useWorkspaceStore((state) => state.renameSheet);
+  const deleteSheet = useWorkspaceStore((state) => state.deleteSheet);
   const deleteBook = useWorkspaceStore((state) => state.deleteBook);
   const undo = useWorkspaceStore((state) => state.undo);
   const redo = useWorkspaceStore((state) => state.redo);
@@ -402,6 +403,48 @@ function App() {
     void finishSheetRename();
   }, [finishSheetRename]);
 
+  const handleDeleteSheet = useCallback(
+    async (bookId: string, sheetId: string) => {
+      const currentSnapshot = useWorkspaceStore.getState().snapshot;
+      const bookEntry = currentSnapshot?.books.find((entry) => entry.data.book.id === bookId);
+      const sheetEntry = bookEntry?.data.sheets.find((entry) => entry.id === sheetId);
+      if (!sheetEntry) {
+        return;
+      }
+
+      const sheetName = sheetEntry.name ?? '名称未設定のシート';
+      const confirmed = await Promise.resolve(
+        window.confirm(`シート「${sheetName}」を削除しますか？この操作は元に戻せません。`)
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      const nextSnapshot = deleteSheet(bookId, sheetId);
+      if (!nextSnapshot) {
+        return;
+      }
+
+      if (renamingSheetId === sheetId) {
+        setRenamingSheetId(null);
+        setDraftSheetName('');
+        skipSheetBlurCommitRef.current = false;
+      }
+
+      if (isTauri && !autoSaveEnabled) {
+        setBusyState('saving');
+        try {
+          await saveWorkspaceSnapshot(nextSnapshot);
+        } catch (error) {
+          await showErrorDialog('シート削除後の保存に失敗しました', toErrorMessage(error));
+        } finally {
+          setBusyState('idle');
+        }
+      }
+    },
+    [autoSaveEnabled, deleteSheet, renamingSheetId, setBusyState]
+  );
+
   const handleDeleteBook = useCallback(
     async (bookId: string) => {
       const currentSnapshot = useWorkspaceStore.getState().snapshot;
@@ -621,6 +664,18 @@ function App() {
                 onRenameCancel={cancelSheetRename}
                 onRenameBlur={handleSheetRenameBlur}
                 renameInputRef={sheetRenameInputRef}
+                onDeleteSheet={
+                  activeBook
+                    ? (sheetId) => {
+                        void handleDeleteSheet(activeBook.book.id, sheetId);
+                      }
+                    : undefined
+                }
+                canDeleteSheet={
+                  activeBook
+                    ? (_sheetId) => (activeBook.sheets ?? []).length > 1
+                    : undefined
+                }
               />
             </div>
           ) : (

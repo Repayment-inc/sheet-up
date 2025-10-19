@@ -14,6 +14,8 @@ interface SheetTabsProps {
   onRenameCancel?: () => void;
   onRenameBlur?: () => void;
   renameInputRef?: MutableRefObject<HTMLInputElement | null>;
+  onDeleteSheet?: (sheetId: string) => void;
+  canDeleteSheet?: (sheetId: string) => boolean;
 }
 
 const SheetTabs: FC<SheetTabsProps> = ({
@@ -28,7 +30,9 @@ const SheetTabs: FC<SheetTabsProps> = ({
   onRenameCommit,
   onRenameCancel,
   onRenameBlur,
-  renameInputRef
+  renameInputRef,
+  onDeleteSheet,
+  canDeleteSheet
 }) => {
   if (!book) {
     return (
@@ -56,6 +60,8 @@ const SheetTabs: FC<SheetTabsProps> = ({
           {book.sheets.map((sheet) => {
             const isActive = sheet.id === selectedSheetId;
             const isRenaming = sheet.id === renamingSheetId;
+            const allowDelete =
+              !!onDeleteSheet && (!canDeleteSheet || canDeleteSheet(sheet.id));
             const className = [
               'sheet-tabs__tab',
               isActive ? 'sheet-tabs__tab--active' : '',
@@ -83,6 +89,9 @@ const SheetTabs: FC<SheetTabsProps> = ({
                   } else if (event.key === 'F2') {
                     event.preventDefault();
                     onStartRename?.(sheet.id);
+                  } else if ((event.key === 'Delete' || event.key === 'Backspace') && allowDelete) {
+                    event.preventDefault();
+                    onDeleteSheet?.(sheet.id);
                   }
                 }}
                 onDoubleClick={() => {
@@ -108,7 +117,22 @@ const SheetTabs: FC<SheetTabsProps> = ({
                     }}
                   />
                 ) : (
-                  <span className="sheet-tabs__tabLabel">{sheet.name}</span>
+                  <>
+                    <span className="sheet-tabs__tabLabel">{sheet.name}</span>
+                    {allowDelete ? (
+                      <button
+                        type="button"
+                        className="sheet-tabs__deleteButton"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDeleteSheet?.(sheet.id);
+                        }}
+                        aria-label={`${sheet.name ?? 'シート'}を削除`}
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </>
                 )}
               </div>
             );
