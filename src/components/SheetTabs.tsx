@@ -15,6 +15,7 @@ interface SheetTabsProps {
   onRenameCancel?: () => void;
   onRenameBlur?: () => void;
   renameInputRef?: MutableRefObject<HTMLInputElement | null>;
+  canDeleteSheet?: (sheetId: string) => boolean;
 }
 
 const SheetTabs: FC<SheetTabsProps> = ({
@@ -30,7 +31,8 @@ const SheetTabs: FC<SheetTabsProps> = ({
   onRenameCommit,
   onRenameCancel,
   onRenameBlur,
-  renameInputRef
+  renameInputRef,
+  canDeleteSheet
 }) => {
   if (!book) {
     return (
@@ -58,6 +60,8 @@ const SheetTabs: FC<SheetTabsProps> = ({
           {book.sheets.map((sheet) => {
             const isActive = sheet.id === selectedSheetId;
             const isRenaming = sheet.id === renamingSheetId;
+            const allowDelete =
+              !!onDeleteSheet && (!canDeleteSheet || canDeleteSheet(sheet.id));
             const className = [
               'sheet-tabs__tab',
               isActive ? 'sheet-tabs__tab--active' : '',
@@ -85,6 +89,9 @@ const SheetTabs: FC<SheetTabsProps> = ({
                   } else if (event.key === 'F2') {
                     event.preventDefault();
                     onStartRename?.(sheet.id);
+                  } else if ((event.key === 'Delete' || event.key === 'Backspace') && allowDelete) {
+                    event.preventDefault();
+                    onDeleteSheet?.(sheet.id);
                   }
                 }}
                 onDoubleClick={() => {
@@ -92,53 +99,42 @@ const SheetTabs: FC<SheetTabsProps> = ({
                   onStartRename?.(sheet.id);
                 }}
               >
-                <div className="sheet-tabs__tabContent">
-                  {isRenaming ? (
-                    <input
-                      ref={renameInputRef ?? undefined}
-                      className="sheet-tabs__renameInput"
-                      value={draftSheetName ?? ''}
-                      onChange={(event) => onRenameChange?.(event.currentTarget.value)}
-                      onBlur={() => onRenameBlur?.()}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault();
-                          onRenameCommit?.();
-                        } else if (event.key === 'Escape') {
-                          event.preventDefault();
-                          onRenameCancel?.();
-                        }
-                      }}
-                    />
-                  ) : (
+                {isRenaming ? (
+                  <input
+                    ref={renameInputRef ?? undefined}
+                    className="sheet-tabs__renameInput"
+                    value={draftSheetName ?? ''}
+                    onChange={(event) => onRenameChange?.(event.currentTarget.value)}
+                    onBlur={() => onRenameBlur?.()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        onRenameCommit?.();
+                      } else if (event.key === 'Escape') {
+                        event.preventDefault();
+                        onRenameCancel?.();
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="sheet-tabs__tabContent">
                     <span className="sheet-tabs__tabLabel">{sheet.name}</span>
-                  )}
-                  {onDeleteSheet ? (
-                    <button
-                      type="button"
-                      className="sheet-tabs__deleteButton"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (isRenaming) return;
-                        onDeleteSheet?.(sheet.id);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
+                    {allowDelete ? (
+                      <button
+                        type="button"
+                        className="sheet-tabs__deleteButton"
+                        onClick={(event) => {
                           event.stopPropagation();
-                          if (isRenaming) {
-                            return;
-                          }
                           onDeleteSheet?.(sheet.id);
-                        }
-                      }}
-                      disabled={isRenaming}
-                      title="このシートを削除"
-                    >
-                      削除
-                    </button>
-                  ) : null}
-                </div>
+                        }}
+                        aria-label={`${sheet.name ?? 'シート'}を削除`}
+                        title="このシートを削除"
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </div>
+                )}
               </div>
             );
           })}

@@ -428,6 +428,7 @@ button {
   justify-content: center;
   min-height: 32px;
   outline: none;
+  gap: 8px;
 }
 
 .sheet-tabs__tab--active {
@@ -491,6 +492,32 @@ button {
 
 .sheet-tabs__renameInput::placeholder {
   color: rgba(55, 65, 81, 0.6);
+}
+
+.sheet-tabs__deleteButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+  line-height: 1;
+  font-size: 0.85rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.sheet-tabs__deleteButton:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: #ef4444;
+}
+
+.sheet-tabs__tab--active .sheet-tabs__deleteButton {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sheet-tabs__tab--active .sheet-tabs__deleteButton:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fee2e2;
 }
 
 .sheet-tabs__placeholder {

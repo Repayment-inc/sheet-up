@@ -514,6 +514,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       return nextSnapshot;
     },
 
+
     deleteSheet: (bookId, sheetId) => {
       const { snapshot, selectedBookId, selectedSheetId } = get();
       if (!snapshot) {
@@ -536,6 +537,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       const nextSheets = bookEntry.data.sheets.filter((sheet) => sheet.id !== sheetId);
       const now = new Date().toISOString();
 
+      let fallbackSheetId: string | null = null;
+      if (nextSheets.length > 0) {
+        const fallbackIndex = Math.min(sheetIndex, nextSheets.length - 1);
+        fallbackSheetId = nextSheets[fallbackIndex]?.id ?? null;
+      }
+
+      const nextSelectedSheetId =
+        selectedBookId === bookId && selectedSheetId === sheetId ? fallbackSheetId : selectedSheetId;
+
       const updatedBookEntry = {
         ...bookEntry,
         data: {
@@ -548,29 +558,32 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         }
       };
 
-      const previousWorkspace = snapshot.workspace.data;
-      const previousSettings = previousWorkspace.workspace.settings ?? {};
+      const updatedBooks = snapshot.books.map((entry, index) =>
+        index === bookIndex ? updatedBookEntry : entry
+      );
+
+      const previousSettings = snapshot.workspace.data.workspace.settings ?? {};
       const updatedRecentSheetIds = (previousSettings.recentSheetIds ?? []).filter(
         (id) => id !== sheetId
       );
 
-      const updatedWorkspaceBooks = previousWorkspace.books.map((ref) => {
+      const updatedWorkspaceBooks = snapshot.workspace.data.books.map((ref) => {
         if (ref.id !== bookId) {
-          return ref;
+          return ref.activeSheetId === sheetId ? { ...ref, activeSheetId: undefined } : ref;
         }
-        const fallbackSheet = nextSheets.length > 0 ? nextSheets[Math.min(sheetIndex, nextSheets.length - 1)] : null;
-        const nextActiveSheetId = ref.activeSheetId === sheetId ? fallbackSheet?.id : ref.activeSheetId;
+        const nextActiveSheetId =
+          ref.activeSheetId === sheetId ? fallbackSheetId ?? undefined : ref.activeSheetId;
         return {
           ...ref,
-          activeSheetId: nextActiveSheetId ?? undefined,
-          updatedAt: now
+          updatedAt: now,
+          activeSheetId: nextActiveSheetId
         };
       });
 
       const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
-        ...previousWorkspace,
+        ...snapshot.workspace.data,
         workspace: {
-          ...previousWorkspace.workspace,
+          ...snapshot.workspace.data.workspace,
           updatedAt: now,
           settings: {
             ...previousSettings,
@@ -582,32 +595,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
 
       const nextSnapshot: WorkspaceSnapshot = {
         workspace: { ...snapshot.workspace, data: workspaceData },
-        books: snapshot.books.map((entry, index) =>
-          index === bookIndex ? updatedBookEntry : entry
-        )
+        books: updatedBooks
       };
-
-      let nextSelectedBookId = selectedBookId;
-      let nextSelectedSheetId = selectedSheetId;
-
-      if (selectedBookId === bookId) {
-        if (nextSheets.length === 0) {
-          nextSelectedSheetId = null;
-        } else if (selectedSheetId === sheetId) {
-          const fallbackSheet = nextSheets[Math.min(sheetIndex, nextSheets.length - 1)];
-          nextSelectedSheetId = fallbackSheet?.id ?? null;
-        }
-      }
 
       set({
         snapshot: nextSnapshot,
-        selectedBookId: nextSelectedBookId,
-        selectedSheetId: nextSelectedSheetId
+        selectedBookId,
+        selectedSheetId: nextSelectedSheetId ?? null
       });
 
       return nextSnapshot;
     },
-
     deleteBook: (bookId) => {
       const { snapshot } = get();
       if (!snapshot) {
