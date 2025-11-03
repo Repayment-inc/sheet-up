@@ -450,6 +450,36 @@ button {
   text-overflow: ellipsis;
 }
 
+.sheet-tabs__tabContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sheet-tabs__deleteButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.sheet-tabs__deleteButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sheet-tabs__deleteButton:not(:disabled):hover {
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.sheet-tabs__tab--active .sheet-tabs__deleteButton:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
 .sheet-tabs__renameInput {
   border: none;
   background: transparent;

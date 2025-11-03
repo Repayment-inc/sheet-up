@@ -83,6 +83,7 @@ type WorkspaceStoreActions = {
   applyCellUpdates: (updates: CellUpdate[]) => WorkspaceSnapshot | null;
   renameBook: (bookId: string, nextName: string) => WorkspaceSnapshot | null;
   renameSheet: (bookId: string, sheetId: string, nextName: string) => WorkspaceSnapshot | null;
+  deleteSheet: (bookId: string, sheetId: string) => WorkspaceSnapshot | null;
   deleteBook: (bookId: string) => WorkspaceSnapshot | null;
   undo: () => WorkspaceSnapshot | null;
   redo: () => WorkspaceSnapshot | null;
@@ -509,6 +510,100 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       };
 
       set({ snapshot: nextSnapshot });
+
+      return nextSnapshot;
+    },
+
+    deleteSheet: (bookId, sheetId) => {
+      const { snapshot, selectedBookId, selectedSheetId } = get();
+      if (!snapshot) {
+        return null;
+      }
+
+      const bookIndex = snapshot.books.findIndex((entry) => entry.data.book.id === bookId);
+      if (bookIndex === -1) {
+        return null;
+      }
+
+      const bookEntry = snapshot.books[bookIndex];
+      const sheetIndex = bookEntry.data.sheets.findIndex((sheet) => sheet.id === sheetId);
+      if (sheetIndex === -1) {
+        return null;
+      }
+
+      recordSnapshotForUndo();
+
+      const nextSheets = bookEntry.data.sheets.filter((sheet) => sheet.id !== sheetId);
+      const now = new Date().toISOString();
+
+      const updatedBookEntry = {
+        ...bookEntry,
+        data: {
+          ...bookEntry.data,
+          book: {
+            ...bookEntry.data.book,
+            updatedAt: now
+          },
+          sheets: nextSheets
+        }
+      };
+
+      const previousWorkspace = snapshot.workspace.data;
+      const previousSettings = previousWorkspace.workspace.settings ?? {};
+      const updatedRecentSheetIds = (previousSettings.recentSheetIds ?? []).filter(
+        (id) => id !== sheetId
+      );
+
+      const updatedWorkspaceBooks = previousWorkspace.books.map((ref) => {
+        if (ref.id !== bookId) {
+          return ref;
+        }
+        const fallbackSheet = nextSheets.length > 0 ? nextSheets[Math.min(sheetIndex, nextSheets.length - 1)] : null;
+        const nextActiveSheetId = ref.activeSheetId === sheetId ? fallbackSheet?.id : ref.activeSheetId;
+        return {
+          ...ref,
+          activeSheetId: nextActiveSheetId ?? undefined,
+          updatedAt: now
+        };
+      });
+
+      const workspaceData: WorkspaceSnapshot['workspace']['data'] = {
+        ...previousWorkspace,
+        workspace: {
+          ...previousWorkspace.workspace,
+          updatedAt: now,
+          settings: {
+            ...previousSettings,
+            recentSheetIds: updatedRecentSheetIds
+          }
+        },
+        books: updatedWorkspaceBooks
+      };
+
+      const nextSnapshot: WorkspaceSnapshot = {
+        workspace: { ...snapshot.workspace, data: workspaceData },
+        books: snapshot.books.map((entry, index) =>
+          index === bookIndex ? updatedBookEntry : entry
+        )
+      };
+
+      let nextSelectedBookId = selectedBookId;
+      let nextSelectedSheetId = selectedSheetId;
+
+      if (selectedBookId === bookId) {
+        if (nextSheets.length === 0) {
+          nextSelectedSheetId = null;
+        } else if (selectedSheetId === sheetId) {
+          const fallbackSheet = nextSheets[Math.min(sheetIndex, nextSheets.length - 1)];
+          nextSelectedSheetId = fallbackSheet?.id ?? null;
+        }
+      }
+
+      set({
+        snapshot: nextSnapshot,
+        selectedBookId: nextSelectedBookId,
+        selectedSheetId: nextSelectedSheetId
+      });
 
       return nextSnapshot;
     },
