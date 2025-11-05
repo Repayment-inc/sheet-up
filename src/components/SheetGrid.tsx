@@ -88,6 +88,8 @@ const SheetGrid: FC<SheetGridProps> = ({ sheet, onCommitCell, onCommitCells }) =
   const [editingValue, setEditingValue] = useState<string>('');
   const gridRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMouseSelectingRef = useRef(false);
+  const dragAnchorRef = useRef<CellPosition | null>(null);
 
   useEffect(() => {
     if (!sheet) {
@@ -146,6 +148,20 @@ const SheetGrid: FC<SheetGridProps> = ({ sheet, onCommitCell, onCommitCells }) =
     if (!gridRef.current) return;
     gridRef.current.focus({ preventScroll: true });
   }, [selectedCell]);
+
+  useEffect(() => {
+    const handleWindowMouseUp = () => {
+      if (!isMouseSelectingRef.current) {
+        return;
+      }
+      isMouseSelectingRef.current = false;
+      dragAnchorRef.current = null;
+    };
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, []);
 
   const startEditing = useCallback(
     (initialValue?: string) => {
@@ -213,19 +229,56 @@ const SheetGrid: FC<SheetGridProps> = ({ sheet, onCommitCell, onCommitCells }) =
 
   const handleCellMouseDown = useCallback(
     (event: MouseEvent<HTMLTableCellElement>, rowKey: string, columnKey: string) => {
+      if (event.button !== 0) {
+        return;
+      }
       event.preventDefault();
+      gridRef.current?.focus({ preventScroll: true });
       const cell = { rowKey, columnKey };
       setEditingCell(null);
+
+      let anchor = cell;
       if (event.shiftKey && (selectionRange || selectedCell)) {
-        const anchor = selectionRange?.start ?? selectedCell ?? cell;
-        setSelectedCell(cell);
+        anchor = selectionRange?.start ?? selectedCell ?? cell;
+        setSelectedCell(anchor);
         setSelectionRange({ start: anchor, end: cell });
       } else {
         updateSelection(cell);
       }
+
+      dragAnchorRef.current = anchor;
+      isMouseSelectingRef.current = true;
     },
-    [selectionRange, updateSelection, selectedCell]
+    [selectedCell, selectionRange, updateSelection]
   );
+
+  const handleCellMouseEnter = useCallback(
+    (event: MouseEvent<HTMLTableCellElement>, rowKey: string, columnKey: string) => {
+      if (!isMouseSelectingRef.current) {
+        return;
+      }
+      if (event.buttons !== undefined && event.buttons === 0) {
+        isMouseSelectingRef.current = false;
+        dragAnchorRef.current = null;
+        return;
+      }
+      const anchor = dragAnchorRef.current;
+      if (!anchor) {
+        return;
+      }
+      const cell = { rowKey, columnKey };
+      setSelectionRange({ start: anchor, end: cell });
+    },
+    []
+  );
+
+  const handleCellMouseUp = useCallback(() => {
+    if (!isMouseSelectingRef.current) {
+      return;
+    }
+    isMouseSelectingRef.current = false;
+    dragAnchorRef.current = null;
+  }, []);
 
   const handleDoubleClick = useCallback(
     (rowKey: string, columnKey: string) => {
@@ -495,6 +548,8 @@ const SheetGrid: FC<SheetGridProps> = ({ sheet, onCommitCell, onCommitCells }) =
                       }${editing ? ' sheet-grid__cell--editing' : ''}`}
                       title={title}
                       onMouseDown={(event) => handleCellMouseDown(event, rowKey, label)}
+                      onMouseEnter={(event) => handleCellMouseEnter(event, rowKey, label)}
+                      onMouseUp={handleCellMouseUp}
                       onDoubleClick={() => handleDoubleClick(rowKey, label)}
                     >
                       {editing ? (
