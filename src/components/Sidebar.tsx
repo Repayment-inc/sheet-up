@@ -5,6 +5,7 @@ interface SidebarProps {
   workspace: WorkspaceFile | null;
   books: BookFile[];
   selectedBookId?: string | null;
+  brokenBookIds?: ReadonlySet<string>;
   onSelectBook: (bookId: string) => void;
   onCreateBook?: () => void;
   onDeleteBook?: (bookId: string) => void;
@@ -16,6 +17,7 @@ const Sidebar: FC<SidebarProps> = ({
   workspace,
   books,
   selectedBookId,
+  brokenBookIds,
   onSelectBook,
   onCreateBook,
   onDeleteBook
@@ -39,20 +41,33 @@ const Sidebar: FC<SidebarProps> = ({
           {workspaceBooks.map((bookRef) => {
             const book = books.find((entry) => entry.book.id === bookRef.id);
             const isActive = bookRef.id === selectedBookId;
+            const isBroken = brokenBookIds?.has(bookRef.id) ?? false;
             const displayName = book?.book.name ?? trimExtension(bookRef.name);
+            const buttonClass = [
+              'sidebar__bookButton',
+              isActive ? 'sidebar__bookButton--active' : '',
+              isBroken ? 'sidebar__bookButton--broken' : ''
+            ]
+              .filter(Boolean)
+              .join(' ');
 
             return (
               <li key={bookRef.id} className="sidebar__bookItem">
                 <div className="sidebar__bookRow">
                   <button
                     type="button"
-                    className={`sidebar__bookButton${isActive ? ' sidebar__bookButton--active' : ''}`}
+                    className={buttonClass}
                     onClick={() => onSelectBook(bookRef.id)}
                   >
                     <span className="sidebar__bookEmoji" role="img" aria-hidden="true">
                       📄
                     </span>
                     <span>{displayName}</span>
+                    {isBroken ? (
+                      <span className="sidebar__bookBadge" aria-label="整合性チェックが必要">
+                        !
+                      </span>
+                    ) : null}
                   </button>
                   <button
                     type="button"

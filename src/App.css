@@ -91,6 +91,25 @@ button {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.sidebar__bookButton--broken {
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.sidebar__bookBadge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
 .sidebar__bookRow {
   display: flex;
   align-items: center;
@@ -321,6 +340,17 @@ button {
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 
+.main-view__actionButton--alert {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(254, 226, 226, 0.4);
+  color: #b91c1c;
+}
+
+.main-view__actionButton--alert:not(:disabled):hover {
+  background: rgba(254, 202, 202, 0.6);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25);
+}
+
 .main-view__toggle {
   display: flex;
   align-items: center;
@@ -342,6 +372,7 @@ button {
   color: #6b7280;
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 .main-view__content {
@@ -573,6 +604,11 @@ button {
   color: #9ca3af;
 }
 
+.main-view__statusAlert {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .sheet-grid {
   flex: 1;
   overflow: auto;
@@ -675,6 +711,257 @@ button {
   padding: 40px;
   text-align: center;
   color: #9ca3af;
+}
+
+.integrity-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.integrity-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.integrity-modal__panel {
+  position: relative;
+  z-index: 1001;
+  width: min(720px, 92vw);
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.integrity-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 24px;
+  gap: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.integrity-modal__headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.integrity-modal__header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.integrity-modal__subtitle {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.integrity-modal__closeButton {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.integrity-modal__closeButton:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.integrity-modal__refreshButton {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.integrity-modal__refreshButton:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.integrity-modal__content {
+  padding: 0 24px;
+  overflow-y: auto;
+}
+
+.integrity-modal__empty {
+  margin: 32px 0;
+  font-size: 0.95rem;
+  color: #4b5563;
+  text-align: center;
+}
+
+.integrity-modal__issueList {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 0;
+}
+
+.integrity-modal__issue {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: #f9fafb;
+}
+
+.integrity-modal__issueHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.integrity-modal__severity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.integrity-modal__severity--error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #b91c1c;
+}
+
+.integrity-modal__severity--warning {
+  background: rgba(249, 115, 22, 0.15);
+  color: #c2410c;
+}
+
+.integrity-modal__issueTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #111827;
+  font-weight: 600;
+}
+
+.integrity-modal__options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.integrity-modal__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.integrity-modal__option input {
+  margin-top: 4px;
+}
+
+.integrity-modal__option:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.integrity-modal__option--active {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.integrity-modal__optionLabel {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.integrity-modal__optionDescription {
+  font-size: 0.8rem;
+  color: #4b5563;
+  margin-top: 4px;
+}
+
+.integrity-modal__footer {
+  border-top: 1px solid #e5e7eb;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #f9fafb;
+}
+
+.integrity-modal__summary {
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.integrity-modal__footerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.integrity-modal__secondaryButton,
+.integrity-modal__primaryButton {
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.integrity-modal__secondaryButton {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #1f2937;
+}
+
+.integrity-modal__secondaryButton:hover {
+  background: #f3f4f6;
+}
+
+.integrity-modal__primaryButton {
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
+}
+
+.integrity-modal__primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.integrity-modal__primaryButton:not(:disabled):hover {
+  background: #1d4ed8;
 }
 
 @media (max-width: 960px) {
