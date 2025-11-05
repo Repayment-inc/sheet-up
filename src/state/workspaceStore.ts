@@ -2,9 +2,15 @@ import { create } from 'zustand';
 import { isTauri } from '../lib/env';
 import { buildNewBookSnapshot } from '../lib/workspace/bookFactory';
 import { buildNewSheetSnapshot } from '../lib/workspace/sheetFactory';
+import { detectIntegrityIssues, applyIntegrityRepairs } from '../lib/workspace/integrity';
 import { sampleWorkspace, sampleBook } from '../samples/sampleData';
 import type { WorkspaceSnapshot } from '../types/workspaceSnapshot';
 import type { BookFile } from '../types/schema';
+import type {
+  IntegrityDecisions,
+  IntegrityDecisionKey,
+  IntegrityIssues
+} from '../types/integrity';
 
 export type BusyState = 'idle' | 'loading' | 'saving';
 
@@ -69,6 +75,8 @@ type WorkspaceStoreState = {
   autoSaveEnabled: boolean;
   history: HistoryEntry[];
   future: HistoryEntry[];
+  integrityIssues: IntegrityIssues;
+  integrityDecisions: IntegrityDecisions;
 };
 
 type WorkspaceStoreActions = {
@@ -87,6 +95,10 @@ type WorkspaceStoreActions = {
   deleteBook: (bookId: string) => WorkspaceSnapshot | null;
   undo: () => WorkspaceSnapshot | null;
   redo: () => WorkspaceSnapshot | null;
+  setIntegrityDecision: (issueId: string, decision: IntegrityDecisionKey) => void;
+  clearIntegrityDecision: (issueId: string) => void;
+  recalculateIntegrity: () => void;
+  applyIntegrityDecisions: () => WorkspaceSnapshot | null;
 };
 
 export type WorkspaceStore = WorkspaceStoreState & WorkspaceStoreActions;
@@ -115,6 +127,35 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
     });
   };
 
+  const updateIntegrityState = (
+    snapshot: WorkspaceSnapshot | null,
+    preserveExistingDecisions: boolean
+  ) => {
+    if (!snapshot) {
+      set({
+        integrityIssues: [],
+        integrityDecisions: {}
+      });
+      return;
+    }
+
+    const detected = detectIntegrityIssues(snapshot);
+    // WHY: 再解析後も残る issue に対しては既存の選択肢を保持し、解消済みのものだけ決定を破棄する。
+    const previousDecisions = preserveExistingDecisions ? get().integrityDecisions : {};
+    const nextDecisions = preserveExistingDecisions
+      ? Object.fromEntries(
+          Object.entries(previousDecisions).filter(([issueId]) =>
+            detected.some((issue) => issue.id === issueId)
+          )
+        )
+      : {};
+
+    set({
+      integrityIssues: detected,
+      integrityDecisions: nextDecisions
+    });
+  };
+
   const applySelectionAfterSnapshot = (snapshot: WorkspaceSnapshot | null) => {
     if (!snapshot) {
       set({ selectedBookId: null, selectedSheetId: null });
@@ -132,6 +173,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
     autoSaveEnabled: isTauri,
     history: [],
     future: [],
+    integrityIssues: isTauri ? [] : detectIntegrityIssues(sampleSnapshot),
+    integrityDecisions: {},
 
     setBusyState: (state) => set({ busyState: state }),
     setAutoSaveEnabled: (enabled) => set({ autoSaveEnabled: enabled }),
@@ -144,6 +187,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         history: [],
         future: []
       });
+      updateIntegrityState(null, false);
     },
 
     loadWorkspace: (snapshot) => {
@@ -153,6 +197,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         future: []
       });
       applySelectionAfterSnapshot(snapshot);
+      updateIntegrityState(snapshot, false);
     },
 
     selectBook: (bookId) => {
@@ -196,6 +241,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         selectedBookId: loadedBook.data.book.id,
         selectedSheetId: defaultSheetId
       });
+      updateIntegrityState(nextSnapshot, true);
 
       return nextSnapshot;
     },
@@ -257,6 +303,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         selectedBookId: bookId,
         selectedSheetId: defaultSheetId
       });
+      updateIntegrityState(nextSnapshot, true);
 
       return { snapshot: nextSnapshot, sheetId: defaultSheetId };
     },
@@ -374,6 +421,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       };
 
       set({ snapshot: nextSnapshot });
+      updateIntegrityState(nextSnapshot, true);
 
       return nextSnapshot;
     },
@@ -437,6 +485,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       };
 
       set({ snapshot: nextSnapshot });
+      updateIntegrityState(nextSnapshot, true);
 
       return nextSnapshot;
     },
@@ -510,6 +559,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
       };
 
       set({ snapshot: nextSnapshot });
+      updateIntegrityState(nextSnapshot, true);
 
       return nextSnapshot;
     },
@@ -601,6 +651,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         selectedBookId,
         selectedSheetId: nextSelectedSheetId ?? null
       });
+      updateIntegrityState(nextSnapshot, true);
 
       return nextSnapshot;
     },
@@ -654,6 +705,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
 
       set({ snapshot: nextSnapshot });
       applySelectionAfterSnapshot(nextSnapshot);
+      updateIntegrityState(nextSnapshot, true);
 
       return nextSnapshot;
     },
@@ -682,6 +734,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         history: nextHistory,
         future: nextFuture
       });
+      updateIntegrityState(lastEntry.snapshot, true);
 
       return lastEntry.snapshot;
     },
@@ -710,8 +763,64 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => {
         history: nextHistory,
         future: nextFuture
       });
+      updateIntegrityState(nextEntry.snapshot, true);
 
       return nextEntry.snapshot;
+    },
+
+    setIntegrityDecision: (issueId, decision) => {
+      set((state) => ({
+        integrityDecisions: {
+          ...state.integrityDecisions,
+          [issueId]: decision
+        }
+      }));
+    },
+
+    clearIntegrityDecision: (issueId) => {
+      const { integrityDecisions } = get();
+      if (!(issueId in integrityDecisions)) {
+        return;
+      }
+      const nextDecisions = { ...integrityDecisions };
+      delete nextDecisions[issueId];
+      set({ integrityDecisions: nextDecisions });
+    },
+
+    recalculateIntegrity: () => {
+      const { snapshot } = get();
+      updateIntegrityState(snapshot, true);
+    },
+
+    applyIntegrityDecisions: () => {
+      const { snapshot, integrityIssues, integrityDecisions, selectedBookId, selectedSheetId } = get();
+      if (!snapshot) {
+        return null;
+      }
+
+      recordSnapshotForUndo();
+
+      const result = applyIntegrityRepairs(snapshot, integrityIssues, integrityDecisions);
+
+      let nextSelectedBookId = selectedBookId;
+      if (selectedBookId && result.bookIdReplacements[selectedBookId]) {
+        nextSelectedBookId = result.bookIdReplacements[selectedBookId];
+      }
+
+      let nextSelectedSheetId = selectedSheetId;
+      if (nextSelectedBookId && nextSelectedBookId in result.sheetSelectionUpdates) {
+        nextSelectedSheetId = result.sheetSelectionUpdates[nextSelectedBookId];
+      }
+
+      // WHY: 修復で ID が差し替わる可能性があるため、同じ論理ブック／シートを選択し続けるよう補正する。
+      set({
+        snapshot: result.snapshot,
+        selectedBookId: nextSelectedBookId ?? null,
+        selectedSheetId: nextSelectedSheetId ?? null
+      });
+      updateIntegrityState(result.snapshot, true);
+
+      return result.snapshot;
     }
   };
 });

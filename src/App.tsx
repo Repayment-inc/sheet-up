@@ -11,6 +11,8 @@ import {
 } from './lib/tauri/workspaceBridge';
 import type { BookFile } from './types/schema';
 import { useWorkspaceStore, type CellUpdate } from './state/workspaceStore';
+import IntegrityModal from './components/IntegrityModal';
+import type { IntegrityDecisionKey } from './types/integrity';
 import './App.css';
 
 const toErrorMessage = (error: unknown): string =>
@@ -22,6 +24,8 @@ function App() {
   const selectedSheetId = useWorkspaceStore((state) => state.selectedSheetId);
   const busyState = useWorkspaceStore((state) => state.busyState);
   const autoSaveEnabled = useWorkspaceStore((state) => state.autoSaveEnabled);
+  const integrityIssues = useWorkspaceStore((state) => state.integrityIssues);
+  const integrityDecisions = useWorkspaceStore((state) => state.integrityDecisions);
 
   const loadWorkspace = useWorkspaceStore((state) => state.loadWorkspace);
   const setBusyState = useWorkspaceStore((state) => state.setBusyState);
@@ -37,7 +41,19 @@ function App() {
   const deleteBook = useWorkspaceStore((state) => state.deleteBook);
   const undo = useWorkspaceStore((state) => state.undo);
   const redo = useWorkspaceStore((state) => state.redo);
-
+  const setIntegrityDecision = useWorkspaceStore((state) => state.setIntegrityDecision);
+  const applyIntegrityDecisions = useWorkspaceStore((state) => state.applyIntegrityDecisions);
+  const recalculateIntegrity = useWorkspaceStore((state) => state.recalculateIntegrity);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [draftBookName, setDraftBookName] = useState('');
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const skipBlurCommitRef = useRef(false);
+  const [renamingSheetId, setRenamingSheetId] = useState<string | null>(null);
+  const [draftSheetName, setDraftSheetName] = useState('');
+  const sheetRenameInputRef = useRef<HTMLInputElement | null>(null);
+  const skipSheetBlurCommitRef = useRef(false);
+  const [isIntegrityModalOpen, setIntegrityModalOpen] = useState(false);
+  const previousIssueCountRef = useRef(integrityIssues.length);
   const handleOpenWorkspace = useCallback(async () => {
     if (!isTauri) return;
     setBusyState('loading');
@@ -57,6 +73,22 @@ function App() {
     if (!isTauri) return;
     const currentSnapshot = useWorkspaceStore.getState().snapshot;
     if (!currentSnapshot) return;
+
+    // WHY: 未解決の選択肢が残った状態で保存すると、ID の不整合を抱えたまま書き戻してしまうため。
+    const hasUnresolvedIntegrity = integrityIssues.some((issue) => {
+      const decision = integrityDecisions[issue.id];
+      return !decision || decision === 'defer';
+    });
+
+    if (hasUnresolvedIntegrity) {
+      setIntegrityModalOpen(true);
+      await showErrorDialog(
+        '整合性チェックが未完了です',
+        '未解決の整合性チェックがあります。対応内容を選択してから保存してください。'
+      );
+      return;
+    }
+
     setBusyState('saving');
     try {
       await saveWorkspaceSnapshot(currentSnapshot);
@@ -65,7 +97,7 @@ function App() {
     } finally {
       setBusyState('idle');
     }
-  }, [setBusyState]);
+  }, [integrityIssues, integrityDecisions, setBusyState]);
 
   useEffect(() => {
     if (!autoSaveEnabled || !isTauri) {
@@ -74,13 +106,21 @@ function App() {
     if (!snapshot) {
       return;
     }
+    // WHY: 未決の整合性がある間は自動保存を抑止し、破損状態での書き込みを防ぐ。
+    const unresolvedIntegrityExists = integrityIssues.some((issue) => {
+      const decision = integrityDecisions[issue.id];
+      return !decision || decision === 'defer';
+    });
+    if (unresolvedIntegrityExists) {
+      return;
+    }
     const timer = window.setTimeout(() => {
       void handleSaveWorkspace();
     }, 800);
     return () => {
       window.clearTimeout(timer);
     };
-  }, [snapshot, autoSaveEnabled, handleSaveWorkspace]);
+  }, [snapshot, autoSaveEnabled, handleSaveWorkspace, integrityIssues, integrityDecisions]);
 
   const loadedBooks = snapshot?.books ?? [];
   const bookFiles: BookFile[] = useMemo(
@@ -194,15 +234,6 @@ function App() {
     [handleApplyCellUpdates]
   );
 
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [draftBookName, setDraftBookName] = useState('');
-  const renameInputRef = useRef<HTMLInputElement | null>(null);
-  const skipBlurCommitRef = useRef(false);
-  const [renamingSheetId, setRenamingSheetId] = useState<string | null>(null);
-  const [draftSheetName, setDraftSheetName] = useState('');
-  const sheetRenameInputRef = useRef<HTMLInputElement | null>(null);
-  const skipSheetBlurCommitRef = useRef(false);
-
   useEffect(() => {
     if (activeBook) {
       setDraftBookName(activeBook.book.name ?? '');
@@ -241,6 +272,14 @@ function App() {
     sheetRenameInputRef.current?.focus();
     sheetRenameInputRef.current?.select();
   }, [renamingSheetId]);
+
+  useEffect(() => {
+    // WHY: 新しい不整合が発生したときだけ自動表示し、それ以外はユーザーが閉じるまで表示を維持する。
+    if (previousIssueCountRef.current === 0 && integrityIssues.length > 0) {
+      setIntegrityModalOpen(true);
+    }
+    previousIssueCountRef.current = integrityIssues.length;
+  }, [integrityIssues.length]);
 
   const handleStartRenaming = useCallback(() => {
     if (!activeBook) return;
@@ -539,6 +578,51 @@ function App() {
   );
 
   const autosaveDescription = autoSaveEnabled ? '自動保存オン' : '自動保存オフ';
+  const unresolvedIssues = useMemo(
+    () =>
+      integrityIssues.filter((issue) => {
+        const decision = integrityDecisions[issue.id];
+        return !decision || decision === 'defer';
+      }),
+    [integrityIssues, integrityDecisions]
+  );
+  const brokenBookIds = useMemo(() => {
+    const ids = new Set<string>();
+    unresolvedIssues.forEach((issue) => {
+      if (issue.bookRefId) {
+        ids.add(issue.bookRefId);
+      }
+    });
+    return ids;
+  }, [unresolvedIssues]);
+  const hasUnresolvedIssues = unresolvedIssues.length > 0;
+  const integrityButtonLabel =
+    integrityIssues.length > 0 ? `整合性チェック (${integrityIssues.length})` : '整合性チェック';
+  const integrityButtonClassName = hasUnresolvedIssues
+    ? 'main-view__actionButton main-view__actionButton--alert'
+    : 'main-view__actionButton';
+
+  const handleIntegrityDecisionChange = useCallback(
+    (issueId: string, decision: IntegrityDecisionKey) => {
+      setIntegrityDecision(issueId, decision);
+    },
+    [setIntegrityDecision]
+  );
+
+  const handleApplyIntegrity = useCallback(() => {
+    applyIntegrityDecisions();
+    recalculateIntegrity();
+    setIntegrityModalOpen(false);
+  }, [applyIntegrityDecisions, recalculateIntegrity]);
+
+  const handleOpenIntegrityModal = useCallback(() => {
+    recalculateIntegrity();
+    setIntegrityModalOpen(true);
+  }, [recalculateIntegrity]);
+
+  const handleCloseIntegrityModal = useCallback(() => {
+    setIntegrityModalOpen(false);
+  }, []);
 
   return (
     <div className="app-shell">
@@ -546,6 +630,7 @@ function App() {
         workspace={workspaceFile}
         books={bookFiles}
         selectedBookId={selectedBookId}
+        brokenBookIds={brokenBookIds}
         onSelectBook={handleSelectBook}
         onCreateBook={handleCreateBook}
         onDeleteBook={handleDeleteBook}
@@ -597,6 +682,14 @@ function App() {
           </div>
           <div className="main-view__headerActions">
             <div className="main-view__toolbar">
+              <button
+                type="button"
+                className={integrityButtonClassName}
+                onClick={handleOpenIntegrityModal}
+                disabled={!snapshot}
+              >
+                {integrityButtonLabel}
+              </button>
               {isTauri ? (
                 <>
                   <button
@@ -627,8 +720,13 @@ function App() {
               ) : null}
             </div>
             <div className="main-view__status">
-              {busyState === 'loading' ? '読み込み中…' : null}
-              {busyState === 'saving' ? '保存中…' : null}
+              {busyState === 'loading' ? <span>読み込み中…</span> : null}
+              {busyState === 'saving' ? <span>保存中…</span> : null}
+              {hasUnresolvedIssues ? (
+                <span className="main-view__statusAlert">
+                  整合性チェック未完了（{unresolvedIssues.length}件）
+                </span>
+              ) : null}
             </div>
           </div>
         </header>
@@ -683,6 +781,15 @@ function App() {
           )}
         </div>
       </section>
+      <IntegrityModal
+        isOpen={isIntegrityModalOpen}
+        issues={integrityIssues}
+        decisions={integrityDecisions}
+        onChangeDecision={handleIntegrityDecisionChange}
+        onApply={handleApplyIntegrity}
+        onClose={handleCloseIntegrityModal}
+        onRefresh={recalculateIntegrity}
+      />
     </div>
   );
 }
