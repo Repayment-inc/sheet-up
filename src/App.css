@@ -599,6 +599,37 @@ button {
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
 }
 
+.main-view__emptyActions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.main-view__secondaryButton {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #1f2937;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.main-view__secondaryButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.main-view__secondaryButton:not(:disabled):hover {
+  background: #f8fafc;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
 .main-view__note {
   font-size: 0.85rem;
   color: #9ca3af;
@@ -962,6 +993,127 @@ button {
 
 .integrity-modal__primaryButton:not(:disabled):hover {
   background: #1d4ed8;
+}
+
+.workspace-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.workspace-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.workspace-dialog__panel {
+  position: relative;
+  margin: 10vh auto 0;
+  width: min(420px, calc(100% - 32px));
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
+  padding: 24px;
+}
+
+.workspace-dialog__header {
+  margin-bottom: 12px;
+}
+
+.workspace-dialog__header h3 {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+  color: #111827;
+}
+
+.workspace-dialog__subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.workspace-dialog__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workspace-dialog__label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.workspace-dialog__input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  font-size: 1rem;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.workspace-dialog__input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.workspace-dialog__input--error {
+  border-color: #f87171;
+}
+
+.workspace-dialog__error {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: #b91c1c;
+}
+
+.workspace-dialog__footer {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.workspace-dialog__secondaryButton,
+.workspace-dialog__primaryButton {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.workspace-dialog__secondaryButton {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.workspace-dialog__secondaryButton:not(:disabled):hover {
+  background: #d1d5db;
+}
+
+.workspace-dialog__primaryButton {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.workspace-dialog__primaryButton:not(:disabled):hover {
+  background: #1d4ed8;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+}
+
+.workspace-dialog__secondaryButton:disabled,
+.workspace-dialog__primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 @media (max-width: 960px) {
