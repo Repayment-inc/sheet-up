@@ -1,6 +1,8 @@
 mod workspace;
 
-use workspace::{delete_book_file, load_workspace_snapshot, save_workspace_snapshot};
+use workspace::{
+    create_workspace, delete_book_file, load_workspace_snapshot, save_workspace_snapshot,
+};
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -15,6 +17,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
+            create_workspace,
             load_workspace_snapshot,
             save_workspace_snapshot,
             delete_book_file

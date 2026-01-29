@@ -25,3 +25,7 @@ dist-ssr
 
 # Private docs
 OBSIDIAN.md
+
+# Rust build artifacts
+target
+src-tauri/target

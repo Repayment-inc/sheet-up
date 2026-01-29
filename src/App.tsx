@@ -2,18 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import SheetGrid from './components/SheetGrid';
 import Sidebar from './components/Sidebar';
 import SheetTabs from './components/SheetTabs';
+import WorkspaceNameDialog from './components/WorkspaceNameDialog';
 import { isTauri } from './lib/env';
 import {
   openWorkspaceFromDialog,
   saveWorkspaceSnapshot,
   showErrorDialog,
-  deleteBookFile
+  deleteBookFile,
+  createWorkspaceAtDirectory,
+  selectWorkspaceParentDirectory
 } from './lib/tauri/workspaceBridge';
 import type { BookFile } from './types/schema';
 import { useWorkspaceStore, type CellUpdate } from './state/workspaceStore';
 import IntegrityModal from './components/IntegrityModal';
 import type { IntegrityDecisionKey } from './types/integrity';
 import './App.css';
+import { validateWorkspaceName } from './lib/validation/workspaceName';
 
 const toErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -54,6 +58,22 @@ function App() {
   const skipSheetBlurCommitRef = useRef(false);
   const [isIntegrityModalOpen, setIntegrityModalOpen] = useState(false);
   const previousIssueCountRef = useRef(integrityIssues.length);
+  const [isWorkspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
+  const [workspaceNameInput, setWorkspaceNameInput] = useState('');
+  const [workspaceNameTouched, setWorkspaceNameTouched] = useState(false);
+  const [workspaceDialogSubmitted, setWorkspaceDialogSubmitted] = useState(false);
+  const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+
+  const workspaceNameValidation = useMemo(
+    () => validateWorkspaceName(workspaceNameInput),
+    [workspaceNameInput]
+  );
+
+  const shouldShowWorkspaceNameError =
+    (workspaceNameTouched || workspaceDialogSubmitted) && !workspaceNameValidation.ok;
+  const workspaceNameError = shouldShowWorkspaceNameError
+    ? workspaceNameValidation.issues[0]?.message ?? null
+    : null;
   const handleOpenWorkspace = useCallback(async () => {
     if (!isTauri) return;
     setBusyState('loading');
@@ -68,6 +88,59 @@ function App() {
       setBusyState('idle');
     }
   }, [loadWorkspace, setBusyState]);
+
+  const handleLaunchWorkspaceDialog = useCallback(() => {
+    if (!isTauri) return;
+    setWorkspaceDialogOpen(true);
+    setWorkspaceNameInput('');
+    setWorkspaceNameTouched(false);
+    setWorkspaceDialogSubmitted(false);
+  }, []);
+
+  const handleWorkspaceNameChange = useCallback((value: string) => {
+    setWorkspaceNameTouched(true);
+    setWorkspaceNameInput(value);
+  }, []);
+
+  const handleWorkspaceDialogCancel = useCallback(() => {
+    setWorkspaceDialogOpen(false);
+    setWorkspaceDialogSubmitted(false);
+    setWorkspaceNameTouched(false);
+    setWorkspaceNameInput('');
+  }, []);
+
+  const handleWorkspaceDialogSubmit = useCallback(async () => {
+    if (!isTauri) return;
+    setWorkspaceDialogSubmitted(true);
+    setWorkspaceNameTouched(true);
+
+    if (!workspaceNameValidation.ok || !workspaceNameValidation.normalized) {
+      return;
+    }
+
+    setIsCreatingWorkspace(true);
+    setBusyState('loading');
+    try {
+      const parentDir = await selectWorkspaceParentDirectory();
+      if (!parentDir) {
+        return;
+      }
+      const snapshot = await createWorkspaceAtDirectory(
+        parentDir,
+        workspaceNameValidation.normalized
+      );
+      loadWorkspace(snapshot);
+      setWorkspaceDialogOpen(false);
+      setWorkspaceDialogSubmitted(false);
+      setWorkspaceNameTouched(false);
+      setWorkspaceNameInput('');
+    } catch (error) {
+      await showErrorDialog('ワークスペースの作成に失敗しました', toErrorMessage(error));
+    } finally {
+      setIsCreatingWorkspace(false);
+      setBusyState('idle');
+    }
+  }, [loadWorkspace, setBusyState, workspaceNameValidation]);
 
   const handleSaveWorkspace = useCallback(async () => {
     if (!isTauri) return;
@@ -563,14 +636,24 @@ function App() {
       <h2>ワークスペースを開いてください</h2>
       <p>既存のワークスペースフォルダを選択すると、workspace.json とブックファイルを読み込みます。</p>
       {isTauri ? (
-        <button
-          type="button"
-          className="main-view__primaryButton"
-          onClick={handleOpenWorkspace}
-          disabled={busyState === 'loading'}
-        >
-          {busyState === 'loading' ? '読み込み中…' : 'ワークスペースを開く'}
-        </button>
+        <div className="main-view__emptyActions">
+          <button
+            type="button"
+            className="main-view__primaryButton"
+            onClick={handleOpenWorkspace}
+            disabled={busyState === 'loading'}
+          >
+            {busyState === 'loading' ? '読み込み中…' : 'ワークスペースを開く'}
+          </button>
+          <button
+            type="button"
+            className="main-view__secondaryButton"
+            onClick={handleLaunchWorkspaceDialog}
+            disabled={busyState === 'loading' || isCreatingWorkspace}
+          >
+            新規ワークスペースを作成
+          </button>
+        </div>
       ) : (
         <p className="main-view__note">ブラウザプレビューではサンプルデータのみ閲覧できます。</p>
       )}
@@ -695,6 +778,14 @@ function App() {
                   <button
                     type="button"
                     className="main-view__actionButton"
+                    onClick={handleLaunchWorkspaceDialog}
+                    disabled={busyState === 'loading' || isCreatingWorkspace}
+                  >
+                    新規ワークスペース
+                  </button>
+                  <button
+                    type="button"
+                    className="main-view__actionButton"
                     onClick={handleOpenWorkspace}
                     disabled={busyState === 'loading'}
                   >
@@ -781,6 +872,15 @@ function App() {
           )}
         </div>
       </section>
+      <WorkspaceNameDialog
+        isOpen={isWorkspaceDialogOpen}
+        value={workspaceNameInput}
+        error={workspaceNameError}
+        isSubmitting={isCreatingWorkspace}
+        onChange={handleWorkspaceNameChange}
+        onSubmit={handleWorkspaceDialogSubmit}
+        onCancel={handleWorkspaceDialogCancel}
+      />
       <IntegrityModal
         isOpen={isIntegrityModalOpen}
         issues={integrityIssues}

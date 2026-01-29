@@ -52,11 +52,11 @@ const normalizeSnapshot = (snapshot: WorkspaceSnapshotDto): WorkspaceSnapshot =>
   books: snapshot.books.map(normalizeBook)
 });
 
-export const selectWorkspaceDirectory = async (): Promise<string | null> => {
+const selectDirectory = async (title: string): Promise<string | null> => {
   const selection = await open({
     directory: true,
     multiple: false,
-    title: 'ワークスペースフォルダを選択'
+    title
   });
 
   if (selection === null) {
@@ -65,6 +65,13 @@ export const selectWorkspaceDirectory = async (): Promise<string | null> => {
 
   return Array.isArray(selection) ? selection[0] : selection;
 };
+
+export const selectWorkspaceDirectory = (): Promise<string | null> => {
+  return selectDirectory('ワークスペースフォルダを選択');
+};
+
+export const selectWorkspaceParentDirectory = (): Promise<string | null> =>
+  selectDirectory('ワークスペースを作成するフォルダを選択');
 
 export const resolveWorkspaceFilePath = async (path: string): Promise<string> => {
   if (path.toLowerCase().endsWith('workspace.json')) {
@@ -84,6 +91,21 @@ export const saveWorkspaceSnapshot = async (
   snapshot: WorkspaceSnapshot
 ): Promise<void> => {
   await invoke('save_workspace_snapshot', { snapshot });
+};
+
+export const createWorkspaceAtDirectory = async (
+  parentDir: string,
+  workspaceName: string,
+  includeSample = true
+): Promise<WorkspaceSnapshot> => {
+  const dto = await invoke<WorkspaceSnapshotDto>('create_workspace', {
+    request: {
+      parentDir,
+      workspaceName,
+      includeSample
+    }
+  });
+  return normalizeSnapshot(dto);
 };
 
 export const deleteBookFile = async (path: string): Promise<void> => {
